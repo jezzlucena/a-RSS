@@ -66,14 +66,14 @@ jobs:
         run: pnpm build
 
       - name: Upload web build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: web-dist
           path: apps/web/dist
           retention-days: 7
 
       - name: Upload api build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: api-dist
           path: apps/api/dist
