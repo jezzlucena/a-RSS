@@ -138,18 +138,26 @@ export async function getArticles(userId: string, params: ArticleListParams) {
     orderByClause = orderDirection(orderColumn);
   }
 
-  // Get articles with user state
+  // Get articles with user state and subscription custom title
   const articleList = await db
     .select({
       article: articles,
       feed: feeds,
       userState: userArticles,
+      subscription: subscriptions,
       ...(useFullTextSearch ? {
         relevance: sql<number>`ts_rank(search_tsvector, plainto_tsquery('english', ${searchQuery}))`,
       } : {}),
     })
     .from(articles)
     .innerJoin(feeds, eq(articles.feedId, feeds.id))
+    .innerJoin(
+      subscriptions,
+      and(
+        eq(subscriptions.feedId, feeds.id),
+        eq(subscriptions.userId, userId)
+      )
+    )
     .leftJoin(
       userArticles,
       and(
@@ -178,11 +186,11 @@ export async function getArticles(userId: string, params: ArticleListParams) {
   }
 
   // Map to response format
-  const result = filteredArticles.map(({ article, feed, userState }) => ({
+  const result = filteredArticles.map(({ article, feed, userState, subscription }) => ({
     ...article,
     feed: {
       id: feed.id,
-      title: feed.title,
+      title: subscription?.customTitle || feed.title,
       iconUrl: feed.iconUrl,
       siteUrl: feed.siteUrl,
     },
@@ -235,6 +243,10 @@ export async function getArticle(userId: string, articleId: string) {
 
   return {
     ...article,
+    feed: {
+      ...article.feed,
+      title: subscription.customTitle || article.feed.title,
+    },
     isRead: userState?.isRead ?? false,
     isSaved: userState?.isSaved ?? false,
   };
@@ -386,20 +398,20 @@ export async function getSearchSuggestions(userId: string, query: string) {
     return [];
   }
 
-  // Search for matching article titles using trigram similarity
+  // Search for matching article titles using ILIKE for partial matching
+  // This is more forgiving than trigram similarity for autocomplete
   const suggestions = await db
     .select({
       title: articles.title,
-      similarity: sql<number>`similarity(title, ${query})`,
     })
     .from(articles)
     .where(
       and(
         inArray(articles.feedId, feedIds),
-        sql`title % ${query}` // Use trigram similarity
+        sql`title ILIKE ${'%' + query + '%'}`
       )
     )
-    .orderBy(sql`similarity(title, ${query}) DESC`)
+    .orderBy(articles.publishedAt)
     .limit(10);
 
   // Extract unique search terms from titles

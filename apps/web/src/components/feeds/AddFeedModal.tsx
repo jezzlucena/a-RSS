@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { X, Rss, Loader2, Check } from 'lucide-react';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui';
 import { useAddFeed, useDiscoverFeed } from '@/hooks/useFeeds';
@@ -12,6 +13,7 @@ interface AddFeedModalProps {
 }
 
 export function AddFeedModal({ isOpen, onClose }: AddFeedModalProps) {
+  const { t } = useTranslation('feeds');
   const [url, setUrl] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>();
   const [step, setStep] = useState<'input' | 'preview' | 'success'>('input');
@@ -71,10 +73,11 @@ export function AddFeedModal({ isOpen, onClose }: AddFeedModalProps) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={handleClose}
           >
-            <Card className="w-full max-w-md">
+            <Card className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-xl">Add Feed</CardTitle>
+                <CardTitle className="text-xl">{t('addModal.title')}</CardTitle>
                 <Button variant="ghost" size="icon-sm" onClick={handleClose}>
                   <X className="w-4 h-4" />
                 </Button>
@@ -84,7 +87,7 @@ export function AddFeedModal({ isOpen, onClose }: AddFeedModalProps) {
                 {step === 'input' && (
                   <>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Feed URL</label>
+                      <label className="text-sm font-medium">{t('addModal.feedUrl')}</label>
                       <div className="flex gap-2">
                         <Input
                           value={url}
@@ -99,7 +102,7 @@ export function AddFeedModal({ isOpen, onClose }: AddFeedModalProps) {
                           {discoverFeed.isPending ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
-                            'Check'
+                            t('addModal.check')
                           )}
                         </Button>
                       </div>
@@ -107,13 +110,13 @@ export function AddFeedModal({ isOpen, onClose }: AddFeedModalProps) {
                         <p className="text-sm text-red-500">
                           {discoverFeed.error instanceof Error
                             ? discoverFeed.error.message
-                            : 'Failed to discover feed'}
+                            : t('addModal.discoverFailed')}
                         </p>
                       )}
                     </div>
 
                     <p className="text-sm text-gray-500">
-                      Enter an RSS/Atom feed URL or website URL to discover feeds.
+                      {t('addModal.hint')}
                     </p>
                   </>
                 )}
@@ -141,7 +144,7 @@ export function AddFeedModal({ isOpen, onClose }: AddFeedModalProps) {
 
                     {categories.length > 0 && (
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Category (optional)</label>
+                        <label className="text-sm font-medium">{t('addModal.categoryOptional')}</label>
                         <div className="flex flex-wrap gap-2">
                           {categories.map((cat) => (
                             <button
@@ -176,9 +179,9 @@ export function AddFeedModal({ isOpen, onClose }: AddFeedModalProps) {
                     >
                       <Check className="w-8 h-8 text-green-500" />
                     </motion.div>
-                    <h3 className="text-lg font-medium">Feed Added!</h3>
+                    <h3 className="text-lg font-medium">{t('addModal.success')}</h3>
                     <p className="text-sm text-gray-500">
-                      Your feed has been added successfully.
+                      {t('addModal.successMessage')}
                     </p>
                   </div>
                 )}
@@ -187,13 +190,13 @@ export function AddFeedModal({ isOpen, onClose }: AddFeedModalProps) {
               {step === 'preview' && (
                 <CardFooter className="flex gap-2 justify-end">
                   <Button variant="ghost" onClick={() => setStep('input')}>
-                    Back
+                    {t('addModal.back')}
                   </Button>
                   <Button onClick={handleSubscribe} disabled={addFeed.isPending}>
                     {addFeed.isPending ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
-                      'Subscribe'
+                      t('addModal.subscribe')
                     )}
                   </Button>
                 </CardFooter>

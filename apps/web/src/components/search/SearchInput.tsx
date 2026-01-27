@@ -9,6 +9,7 @@ interface SearchInputProps {
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
+  initialValue?: string;
 }
 
 export function SearchInput({
@@ -16,8 +17,9 @@ export function SearchInput({
   placeholder = 'Search articles...',
   className,
   autoFocus = false,
+  initialValue = '',
 }: SearchInputProps) {
-  const { query, setQuery, suggestions, isLoading, clearQuery } = useSearchSuggestions();
+  const { query, setQuery, suggestions, isLoading, clearQuery } = useSearchSuggestions(initialValue);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -42,10 +44,8 @@ export function SearchInput({
 
   const handleSubmit = (searchQuery?: string) => {
     const finalQuery = searchQuery || query;
-    if (finalQuery.trim()) {
-      onSearch(finalQuery.trim());
-      setIsOpen(false);
-    }
+    onSearch(finalQuery.trim());
+    setIsOpen(false);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -87,13 +87,6 @@ export function SearchInput({
   return (
     <div ref={containerRef} className={cn('relative', className)}>
       <div className="relative">
-        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-          {isLoading ? (
-            <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
-          ) : (
-            <Search className="w-4 h-4 text-muted-foreground" />
-          )}
-        </div>
         <input
           ref={inputRef}
           type="text"
@@ -112,6 +105,13 @@ export function SearchInput({
             'transition-all duration-200'
           )}
         />
+        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+          {isLoading ? (
+            <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
+          ) : (
+            <Search className="w-4 h-4 text-muted-foreground" />
+          )}
+        </div>
         {query && (
           <button
             onClick={handleClear}
@@ -131,7 +131,7 @@ export function SearchInput({
             transition={{ duration: 0.15 }}
             className={cn(
               'absolute z-50 w-full mt-2',
-              'bg-background/95 backdrop-blur-lg',
+              'bg-white/95 backdrop-blur-xl',
               'border border-border/50 rounded-lg',
               'shadow-lg overflow-hidden'
             )}

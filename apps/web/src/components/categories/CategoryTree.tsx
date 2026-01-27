@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FolderOpen,
@@ -11,9 +13,7 @@ import {
 } from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Button } from '@/components/ui';
-import { CategoryModal } from './CategoryModal';
 import { useCategories, useDeleteCategory } from '@/hooks/useCategories';
-import { useFeedStore } from '@/stores/feedStore';
 import { cn } from '@/lib/utils';
 import type { Category, CategoryWithChildren } from '@arss/types';
 
@@ -24,15 +24,17 @@ interface CategoryItemProps {
 }
 
 function CategoryItem({ category, level, onEdit }: CategoryItemProps) {
+  const { t } = useTranslation('navigation');
   const [isExpanded, setIsExpanded] = useState(true);
-  const { selectedCategoryId, selectCategory } = useFeedStore();
+  const navigate = useNavigate();
+  const location = useLocation();
   const deleteCategory = useDeleteCategory();
 
   const hasChildren = category.children && category.children.length > 0;
-  const isSelected = selectedCategoryId === category.id;
+  const isSelected = location.pathname === `/category/${category.id}`;
 
   const handleDelete = async () => {
-    if (confirm(`Are you sure you want to delete "${category.name}"?`)) {
+    if (confirm(t('categoryMenu.confirmDelete', { name: category.name }))) {
       await deleteCategory.mutateAsync(category.id);
     }
   };
@@ -69,7 +71,7 @@ function CategoryItem({ category, level, onEdit }: CategoryItemProps) {
 
         {/* Icon & Name */}
         <button
-          onClick={() => selectCategory(category.id)}
+          onClick={() => navigate(`/category/${category.id}`)}
           className="flex-1 flex items-center gap-2 min-w-0"
         >
           {isExpanded && hasChildren ? (
@@ -103,7 +105,7 @@ function CategoryItem({ category, level, onEdit }: CategoryItemProps) {
                 onSelect={() => onEdit(category)}
               >
                 <Edit className="w-4 h-4" />
-                Edit
+                {t('categoryMenu.edit')}
               </DropdownMenu.Item>
 
               <DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
@@ -113,7 +115,7 @@ function CategoryItem({ category, level, onEdit }: CategoryItemProps) {
                 onSelect={handleDelete}
               >
                 <Trash2 className="w-4 h-4" />
-                Delete
+                {t('categoryMenu.delete')}
               </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
@@ -144,34 +146,28 @@ function CategoryItem({ category, level, onEdit }: CategoryItemProps) {
   );
 }
 
-export function CategoryTree() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+interface CategoryTreeProps {
+  onAddCategory: () => void;
+  onEditCategory: (category: Category) => void;
+}
+
+export function CategoryTree({ onAddCategory, onEditCategory }: CategoryTreeProps) {
+  const { t } = useTranslation('navigation');
 
   const { data: categories = [] } = useCategories();
-
-  const handleEdit = (category: Category) => {
-    setEditingCategory(category);
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingCategory(null);
-  };
 
   return (
     <div className="space-y-1">
       {/* Header */}
       <div className="flex items-center justify-between px-3 mb-2">
         <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-          Categories
+          {t('sidebar.categories')}
         </span>
         <Button
           variant="ghost"
           size="icon-sm"
           className="h-6 w-6"
-          onClick={() => setIsModalOpen(true)}
+          onClick={onAddCategory}
         >
           <Plus className="w-4 h-4" />
         </Button>
@@ -179,24 +175,17 @@ export function CategoryTree() {
 
       {/* Category List */}
       {categories.length === 0 ? (
-        <p className="px-3 text-sm text-gray-400">No categories yet</p>
+        <p className="px-3 text-sm text-gray-400">{t('sidebar.noCategories')}</p>
       ) : (
         categories.map((category) => (
           <CategoryItem
             key={category.id}
             category={category as CategoryWithChildren}
             level={0}
-            onEdit={handleEdit}
+            onEdit={onEditCategory}
           />
         ))
       )}
-
-      {/* Modal */}
-      <CategoryModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        category={editingCategory}
-      />
     </div>
   );
 }

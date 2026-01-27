@@ -1,0 +1,28 @@
+{
+  "placeholder": "Buscar artículos...",
+  "searching": "Buscando...",
+  "enterSearchTerm": "Ingresa un término para buscar artículos",
+  "resultsFor": "{{count}} resultados para",
+  "resultsForNoCount": "Resultados para",
+  "clear": "Limpiar",
+  "noResults": "No se encontraron artículos para \"{{query}}\"",
+  "noResultsHint": "Intenta con diferentes palabras clave o revisa la ortografía",
+  "previous": "Anterior",
+  "next": "Siguiente",
+  "pageOf": "Página {{page}} de {{totalPages}}",
+  "filters": {
+    "title": "Filtros",
+    "clearAll": "Limpiar todos",
+    "dateRange": "Rango de fechas",
+    "to": "hasta",
+    "category": "Categoría",
+    "allCategories": "Todas las categorías",
+    "feed": "Feed",
+    "allFeeds": "Todos los feeds",
+    "quickPresets": "Atajos rápidos",
+    "today": "Hoy",
+    "week": "Semana",
+    "month": "Mes",
+    "threeMonths": "3 Meses"
+  }
+}

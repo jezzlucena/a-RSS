@@ -1,20 +1,24 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { Rss, BookOpen } from 'lucide-react';
 import { Card, CardContent, Spinner, ArticleListSkeleton } from '@/components/ui';
-import { useArticles, useMarkAsRead } from '@/hooks/useArticles';
+import { useArticles, useMarkAsRead, useTimeFormat } from '@/hooks';
 import { useUIStore } from '@/stores/uiStore';
 import { useArticleStore } from '@/stores/articleStore';
 import { useFeedStore } from '@/stores/feedStore';
-import { formatRelativeTime } from '@arss/utils';
 import { cn } from '@/lib/utils';
 import type { ArticleWithState } from '@arss/types';
 
+type SortOrder = 'newest' | 'oldest';
+
 interface ArticleListProps {
   onSelectArticle?: (article: ArticleWithState) => void;
+  sortOrder?: SortOrder;
 }
 
-export function ArticleList({ onSelectArticle }: ArticleListProps) {
+export function ArticleList({ onSelectArticle, sortOrder = 'newest' }: ArticleListProps) {
+  const { t } = useTranslation('articles');
   const { layout } = useUIStore();
   const { selectedArticleId } = useArticleStore();
   const { selectedFeedId, selectedCategoryId, selectedView } = useFeedStore();
@@ -25,6 +29,7 @@ export function ArticleList({ onSelectArticle }: ArticleListProps) {
     categoryId: selectedCategoryId ?? undefined,
     isRead: selectedView === 'unread' ? false : undefined,
     isSaved: selectedView === 'saved' ? true : undefined,
+    sortOrder: sortOrder === 'newest' ? 'desc' : 'asc' as const,
   };
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
@@ -72,25 +77,26 @@ export function ArticleList({ onSelectArticle }: ArticleListProps) {
         <div className="w-16 h-16 mb-4 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
           <BookOpen className="w-8 h-8 text-gray-400" />
         </div>
-        <h3 className="text-lg font-medium mb-2">No articles</h3>
+        <h3 className="text-lg font-medium mb-2">{t('emptyState.title')}</h3>
         <p className="text-gray-500">
           {selectedView === 'saved'
-            ? 'No saved articles yet.'
+            ? t('emptyState.noSaved')
             : selectedView === 'unread'
-            ? 'All caught up!'
-            : 'No articles to display.'}
+            ? t('emptyState.allCaughtUp')
+            : t('emptyState.noArticles')}
         </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-2">
       <div
         className={cn(
           layout === 'cards' && 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4',
           layout === 'magazine' && 'grid grid-cols-1 lg:grid-cols-2 gap-6',
-          layout === 'list' && 'space-y-2'
+          layout === 'list' && 'space-y-2',
+          layout === 'compact' && 'space-y-0 divide-y divide-gray-200 dark:divide-gray-700'
         )}
       >
         {articles.map((article, index) => (
@@ -120,17 +126,58 @@ export function ArticleList({ onSelectArticle }: ArticleListProps) {
 
 interface ArticleCardProps {
   article: ArticleWithState;
-  layout: 'list' | 'cards' | 'magazine';
+  layout: 'compact' | 'list' | 'cards' | 'magazine';
   isSelected: boolean;
   onClick: () => void;
 }
 
 function ArticleCard({ article, layout, isSelected, onClick }: ArticleCardProps) {
+  const { formatRelativeTime } = useTimeFormat();
   const baseClasses = cn(
     'cursor-pointer transition-all duration-200',
     article.isRead && 'opacity-60',
     isSelected && 'ring-2 ring-accent-500'
   );
+
+  if (layout === 'compact') {
+    return (
+      <div
+        className={cn(
+          'px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors',
+          isSelected && 'bg-accent-500/10',
+          article.isRead && 'opacity-60'
+        )}
+        onClick={onClick}
+      >
+        <div className="flex items-center gap-3">
+          {/* Unread indicator */}
+          {!article.isRead && (
+            <span className="w-2 h-2 rounded-full bg-accent-500 flex-shrink-0" />
+          )}
+          {article.isRead && <span className="w-2 flex-shrink-0" />}
+
+          {/* Feed icon */}
+          {article.feed.iconUrl ? (
+            <img
+              src={article.feed.iconUrl}
+              alt=""
+              className="w-4 h-4 rounded flex-shrink-0"
+            />
+          ) : (
+            <Rss className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          )}
+
+          {/* Title */}
+          <h3 className="flex-1 text-sm font-medium truncate">{article.title}</h3>
+
+          {/* Time */}
+          <span className="text-xs text-gray-400 flex-shrink-0 whitespace-nowrap">
+            {formatRelativeTime(article.publishedAt)}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   if (layout === 'list') {
     return (
@@ -158,7 +205,7 @@ function ArticleCard({ article, layout, isSelected, onClick }: ArticleCardProps)
               <span className="text-xs text-gray-500 truncate">
                 {article.feed.title}
               </span>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-gray-400 whitespace-nowrap">
                 {formatRelativeTime(article.publishedAt)}
               </span>
             </div>
@@ -204,7 +251,7 @@ function ArticleCard({ article, layout, isSelected, onClick }: ArticleCardProps)
               {article.summary}
             </p>
           )}
-          <p className="text-xs text-gray-400 mt-2">
+          <p className="text-xs text-gray-400 mt-2 whitespace-nowrap">
             {formatRelativeTime(article.publishedAt)}
           </p>
         </CardContent>
@@ -215,12 +262,12 @@ function ArticleCard({ article, layout, isSelected, onClick }: ArticleCardProps)
   // Magazine layout
   return (
     <Card hover className={baseClasses} onClick={onClick}>
-      <CardContent className="p-0 flex">
+      <CardContent className="p-0 flex flex-col">
         {article.imageUrl && (
           <img
             src={article.imageUrl}
             alt=""
-            className="w-48 h-full object-cover rounded-l-xl"
+            className="w-full h-36 object-cover rounded-l-xl"
             loading="lazy"
           />
         )}
@@ -236,7 +283,7 @@ function ArticleCard({ article, layout, isSelected, onClick }: ArticleCardProps)
               <Rss className="w-4 h-4 text-gray-400" />
             )}
             <span className="text-xs text-gray-500">{article.feed.title}</span>
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-gray-400 whitespace-nowrap">
               {formatRelativeTime(article.publishedAt)}
             </span>
           </div>

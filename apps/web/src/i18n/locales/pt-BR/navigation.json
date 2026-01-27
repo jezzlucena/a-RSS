@@ -1,0 +1,37 @@
+{
+  "sidebar": {
+    "allArticles": "Todos os Artigos",
+    "unread": "Não Lidos",
+    "saved": "Salvos",
+    "feeds": "Feeds",
+    "categories": "Categorias",
+    "noCategories": "Nenhuma categoria ainda",
+    "settings": "Configurações",
+    "allSettings": "Todas as Configurações",
+    "theme": "Tema",
+    "light": "Claro",
+    "dark": "Escuro",
+    "system": "Sistema",
+    "data": "Dados",
+    "importExportOPML": "Importar / Exportar OPML"
+  },
+  "categoryMenu": {
+    "edit": "Editar",
+    "delete": "Excluir",
+    "confirmDelete": "Tem certeza que deseja excluir \"{{name}}\"?"
+  },
+  "viewTitles": {
+    "all": "Todos os Artigos",
+    "unread": "Não Lidos",
+    "saved": "Salvos",
+    "feed": "Feed",
+    "category": "Categoria",
+    "search": "Busca",
+    "searchQuery": "Busca: \"{{query}}\""
+  },
+  "welcome": {
+    "title": "Bem-vindo ao aRSS",
+    "description": "Comece adicionando seu primeiro feed RSS. Fique atualizado com todo o seu conteúdo favorito em um só lugar.",
+    "addFirstFeed": "Adicionar Seu Primeiro Feed"
+  }
+}

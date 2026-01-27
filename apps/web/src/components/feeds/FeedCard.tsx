@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import {
   Rss,
   MoreHorizontal,
@@ -11,8 +12,7 @@ import {
 } from 'lucide-react';
 import { Button, Card, CardContent } from '@/components/ui';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { useRefreshFeed, useDeleteFeed } from '@/hooks/useFeeds';
-import { formatRelativeTime } from '@arss/utils';
+import { useRefreshFeed, useDeleteFeed, useTimeFormat } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { SubscriptionWithFeed } from '@arss/types';
 
@@ -31,9 +31,11 @@ export function FeedCard({
   onEdit,
   onMove,
 }: FeedCardProps) {
+  const { t } = useTranslation('feeds');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const refreshFeed = useRefreshFeed();
   const deleteFeed = useDeleteFeed();
+  const { formatRelativeTime } = useTimeFormat();
 
   const { feed } = subscription;
   const displayTitle = subscription.customTitle || feed.title;
@@ -91,7 +93,7 @@ export function FeedCard({
             )}
             <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
               {feed.lastFetchedAt && (
-                <span>Updated {formatRelativeTime(feed.lastFetchedAt)}</span>
+                <span>{t('updated', { time: formatRelativeTime(feed.lastFetchedAt) })}</span>
               )}
               {feed.lastError && (
                 <span className="text-red-500 truncate" title={feed.lastError}>

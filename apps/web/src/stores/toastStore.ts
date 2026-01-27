@@ -25,7 +25,7 @@ export const useToastStore = create<ToastState>((set) => ({
     const id = `toast-${++toastId}`;
     const newToast: Toast = {
       id,
-      duration: 4000,
+      duration: 5000, // 5 seconds default
       ...toast,
     };
 
@@ -33,14 +33,8 @@ export const useToastStore = create<ToastState>((set) => ({
       toasts: [...state.toasts, newToast],
     }));
 
-    // Auto-remove after duration
-    if (newToast.duration && newToast.duration > 0) {
-      setTimeout(() => {
-        set((state) => ({
-          toasts: state.toasts.filter((t) => t.id !== id),
-        }));
-      }, newToast.duration);
-    }
+    // Note: Auto-dismiss is now handled by the ToastItem component
+    // to support pause-on-hover functionality
   },
 
   removeToast: (id) => {

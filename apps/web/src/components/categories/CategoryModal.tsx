@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { X, FolderPlus, Loader2 } from 'lucide-react';
 import {
   Button,
@@ -28,6 +29,7 @@ interface CategoryModalProps {
 }
 
 export function CategoryModal({ isOpen, onClose, category }: CategoryModalProps) {
+  const { t } = useTranslation('feeds');
   const [name, setName] = useState('');
   const [color, setColor] = useState(PRESET_COLORS[4]);
   const [parentId, setParentId] = useState<string | null>(null);
@@ -108,12 +110,13 @@ export function CategoryModal({ isOpen, onClose, category }: CategoryModalProps)
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={handleClose}
           >
-            <Card className="w-full max-w-md">
+            <Card className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-xl flex items-center gap-2">
                   <FolderPlus className="w-5 h-5" />
-                  {isEditing ? 'Edit Category' : 'New Category'}
+                  {isEditing ? t('categoryModal.editTitle') : t('categoryModal.newTitle')}
                 </CardTitle>
                 <Button variant="ghost" size="icon-sm" onClick={handleClose}>
                   <X className="w-4 h-4" />
@@ -123,18 +126,18 @@ export function CategoryModal({ isOpen, onClose, category }: CategoryModalProps)
               <CardContent className="space-y-4">
                 {/* Name */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Name</label>
+                  <label className="text-sm font-medium">{t('categoryModal.name')}</label>
                   <Input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Category name"
+                    placeholder={t('categoryModal.namePlaceholder')}
                     autoFocus
                   />
                 </div>
 
                 {/* Color Picker */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Color</label>
+                  <label className="text-sm font-medium">{t('categoryModal.color')}</label>
                   <div className="grid grid-cols-8 gap-2">
                     {PRESET_COLORS.map((presetColor) => (
                       <button
@@ -151,7 +154,7 @@ export function CategoryModal({ isOpen, onClose, category }: CategoryModalProps)
                     ))}
                   </div>
                   <div className="flex items-center gap-2 mt-2">
-                    <span className="text-sm text-gray-500">Custom:</span>
+                    <span className="text-sm text-gray-500">{t('categoryModal.custom')}:</span>
                     <input
                       type="color"
                       value={color}
@@ -170,7 +173,7 @@ export function CategoryModal({ isOpen, onClose, category }: CategoryModalProps)
                 {/* Parent Category */}
                 {availableParents.length > 0 && (
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Parent Category</label>
+                    <label className="text-sm font-medium">{t('categoryModal.parentCategory')}</label>
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => setParentId(null)}
@@ -181,7 +184,7 @@ export function CategoryModal({ isOpen, onClose, category }: CategoryModalProps)
                             : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
                         )}
                       >
-                        None (Top Level)
+                        {t('categoryModal.noneTopLevel')}
                       </button>
                       {availableParents.map((cat) => (
                         <button
@@ -207,14 +210,14 @@ export function CategoryModal({ isOpen, onClose, category }: CategoryModalProps)
 
                 {/* Preview */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Preview</label>
+                  <label className="text-sm font-medium">{t('categoryModal.preview')}</label>
                   <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 flex items-center gap-2">
                     <div
                       className="w-4 h-4 rounded"
                       style={{ backgroundColor: color }}
                     />
                     <span className="font-medium">
-                      {name || 'Category name'}
+                      {name || t('categoryModal.namePlaceholder')}
                     </span>
                   </div>
                 </div>
@@ -222,7 +225,7 @@ export function CategoryModal({ isOpen, onClose, category }: CategoryModalProps)
 
               <CardFooter className="flex gap-2 justify-end">
                 <Button variant="ghost" onClick={handleClose}>
-                  Cancel
+                  {t('categoryModal.cancel')}
                 </Button>
                 <Button
                   onClick={handleSave}
@@ -231,9 +234,9 @@ export function CategoryModal({ isOpen, onClose, category }: CategoryModalProps)
                   {mutation.isPending ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : isEditing ? (
-                    'Save Changes'
+                    t('categoryModal.saveChanges')
                   ) : (
-                    'Create Category'
+                    t('categoryModal.createCategory')
                   )}
                 </Button>
               </CardFooter>

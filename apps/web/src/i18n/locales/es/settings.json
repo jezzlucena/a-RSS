@@ -1,0 +1,91 @@
+{
+  "title": "Configuración",
+  "subtitle": "Personaliza tu experiencia de lectura",
+  "backToArticles": "Volver a Artículos",
+  "appearance": {
+    "title": "Apariencia",
+    "description": "Elige cómo se ve aRSS para ti",
+    "light": "Claro",
+    "dark": "Oscuro",
+    "system": "Sistema"
+  },
+  "accentColor": {
+    "title": "Color de Acento",
+    "description": "Elige un color que refleje tu estilo",
+    "custom": "Personalizado"
+  },
+  "feedLayout": {
+    "title": "Diseño del Feed",
+    "description": "Elige cómo se muestran los artículos en el feed",
+    "compact": "Compacto",
+    "list": "Lista",
+    "cards": "Tarjetas",
+    "magazine": "Revista"
+  },
+  "articleView": {
+    "title": "Vista de Artículo",
+    "description": "Cómo se abren los artículos cuando haces clic",
+    "splitHorizontal": "División Horizontal",
+    "splitVertical": "División Vertical",
+    "horizontalSplit": "División Horizontal",
+    "verticalSplit": "División Vertical",
+    "overlay": "Superposición",
+    "full": "Pantalla Completa"
+  },
+  "reading": {
+    "title": "Lectura",
+    "description": "Personaliza tu experiencia de lectura",
+    "fontSizeLabel": "Tamaño de Fuente",
+    "fontSize": "Tamaño de Fuente",
+    "small": "Pequeño",
+    "medium": "Mediano",
+    "large": "Grande"
+  },
+  "language": {
+    "title": "Idioma",
+    "description": "Elige tu idioma preferido"
+  },
+  "security": {
+    "title": "Seguridad",
+    "description": "Actualiza tu contraseña",
+    "currentPassword": "Contraseña Actual",
+    "currentPasswordPlaceholder": "Ingresa la contraseña actual",
+    "newPassword": "Nueva Contraseña",
+    "newPasswordPlaceholder": "Ingresa la nueva contraseña (mín. 8 caracteres)",
+    "confirmPassword": "Confirmar Nueva Contraseña",
+    "confirmNewPassword": "Confirmar Nueva Contraseña",
+    "confirmPasswordPlaceholder": "Confirma la nueva contraseña",
+    "changePassword": "Cambiar Contraseña",
+    "changePasswordButton": "Cambiar Contraseña",
+    "changingPassword": "Cambiando Contraseña...",
+    "passwordChanged": "Contraseña cambiada con éxito",
+    "passwordChangeFailed": "Error al cambiar contraseña",
+    "fillAllFields": "Por favor, completa todos los campos de contraseña",
+    "passwordMinLength": "La nueva contraseña debe tener al menos 8 caracteres",
+    "passwordsNoMatch": "Las nuevas contraseñas no coinciden"
+  },
+  "passwordMessages": {
+    "success": "Contraseña cambiada con éxito",
+    "failed": "Error al cambiar contraseña",
+    "fillAllFields": "Por favor, completa todos los campos de contraseña",
+    "minLength": "La nueva contraseña debe tener al menos 8 caracteres",
+    "noMatch": "Las nuevas contraseñas no coinciden"
+  },
+  "data": {
+    "title": "Datos",
+    "opml": "Importar / Exportar OPML"
+  },
+  "techStack": {
+    "title": "Stack Tecnológico",
+    "description": "Construido con tecnologías modernas y de código abierto"
+  },
+  "about": {
+    "title": "Acerca de",
+    "subtitle": "aRSS - another RSS Software Solution",
+    "description": "aRSS es un lector de RSS moderno y de código abierto enfocado en proporcionar una experiencia de lectura hermosa e intuitiva. Mantente actualizado con todo tu contenido favorito en un solo lugar.",
+    "text": "aRSS es un lector de RSS moderno y de código abierto enfocado en proporcionar una experiencia de lectura hermosa e intuitiva. Mantente actualizado con todo tu contenido favorito en un solo lugar.",
+    "viewOnGitHub": "Ver en GitHub",
+    "viewOnGithub": "Ver en GitHub",
+    "sponsor": "Patrocinar"
+  }
+}

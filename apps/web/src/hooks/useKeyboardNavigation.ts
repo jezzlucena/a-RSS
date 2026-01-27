@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useArticleStore } from '@/stores/articleStore';
 import { useMarkAsRead, useMarkAsUnread, useToggleSaved } from './useArticles';
 import type { ArticleWithState } from '@arss/types';
@@ -191,15 +192,17 @@ export function useKeyboardNavigation(options: UseKeyboardNavigationOptions = {}
 
 // Hook to display keyboard shortcuts help
 export function useKeyboardShortcuts() {
+  const { t } = useTranslation('shortcuts');
+
   return [
-    { key: 'j / ↓', description: 'Next article' },
-    { key: 'k / ↑', description: 'Previous article' },
-    { key: 'o / Enter', description: 'Open article' },
-    { key: 'm', description: 'Toggle read/unread' },
-    { key: 's', description: 'Toggle saved' },
-    { key: '/', description: 'Focus search' },
-    { key: 'Esc', description: 'Deselect / Close' },
-    { key: 'G', description: 'Go to last article' },
-    { key: '?', description: 'Show this help' },
+    { key: 'j / ↓', description: t('nextArticle') },
+    { key: 'k / ↑', description: t('prevArticle') },
+    { key: 'o / Enter', description: t('openArticle') },
+    { key: 'm', description: t('toggleReadUnread') },
+    { key: 's', description: t('toggleSaved') },
+    { key: '/', description: t('focusSearch') },
+    { key: 'Esc', description: t('deselectClose') },
+    { key: 'G', description: t('goToLast') },
+    { key: '?', description: t('showHelp') },
   ];
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
@@ -9,18 +10,19 @@ import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardConten
 import api, { getErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
-const loginSchema = z.object({
-  email: z.string().email('Please enter a valid email'),
-  password: z.string().min(1, 'Password is required'),
-});
-
-type LoginForm = z.infer<typeof loginSchema>;
-
 export function LoginPage() {
+  const { t } = useTranslation('auth');
   const navigate = useNavigate();
   const { login } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const loginSchema = z.object({
+    email: z.string().email(t('validation.emailRequired')),
+    password: z.string().min(1, t('validation.passwordRequired')),
+  });
+
+  type LoginForm = z.infer<typeof loginSchema>;
 
   const {
     register,
@@ -45,8 +47,8 @@ export function LoginPage() {
   return (
     <Card className="w-full">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Welcome back</CardTitle>
-        <CardDescription>Sign in to your account to continue</CardDescription>
+        <CardTitle className="text-2xl">{t('login.title')}</CardTitle>
+        <CardDescription>{t('login.subtitle')}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -62,14 +64,14 @@ export function LoginPage() {
 
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm font-medium">
-              Email
+              {t('login.emailLabel')}
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 id="email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder={t('login.emailPlaceholder')}
                 className="pl-10"
                 {...register('email')}
               />
@@ -81,14 +83,14 @@ export function LoginPage() {
 
           <div className="space-y-2">
             <label htmlFor="password" className="text-sm font-medium">
-              Password
+              {t('login.passwordLabel')}
             </label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
-                placeholder="Enter your password"
+                placeholder={t('login.passwordPlaceholder')}
                 className="pl-10 pr-10"
                 {...register('password')}
               />
@@ -110,18 +112,18 @@ export function LoginPage() {
           </div>
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? <Spinner size="sm" /> : 'Sign in'}
+            {isSubmitting ? <Spinner size="sm" /> : t('login.submitButton')}
           </Button>
         </form>
       </CardContent>
       <CardFooter className="justify-center">
         <p className="text-sm text-gray-500">
-          Don't have an account?{' '}
+          {t('login.noAccount')}{' '}
           <Link
             to="/auth/register"
             className="text-accent-500 hover:text-accent-600 font-medium"
           >
-            Sign up
+            {t('login.signUpLink')}
           </Link>
         </p>
       </CardFooter>

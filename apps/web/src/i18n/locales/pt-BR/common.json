@@ -1,0 +1,51 @@
+{
+  "buttons": {
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "close": "Fechar",
+    "back": "Voltar",
+    "next": "Próximo",
+    "submit": "Enviar",
+    "confirm": "Confirmar",
+    "delete": "Excluir",
+    "edit": "Editar",
+    "add": "Adicionar",
+    "create": "Criar",
+    "update": "Atualizar",
+    "refresh": "Atualizar",
+    "retry": "Tentar novamente",
+    "tryAgain": "Tentar Novamente",
+    "goHome": "Ir para Início",
+    "check": "Verificar",
+    "subscribe": "Inscrever-se"
+  },
+  "labels": {
+    "loading": "Carregando...",
+    "custom": "Personalizado",
+    "optional": "opcional",
+    "none": "Nenhum",
+    "uncategorized": "Sem categoria",
+    "noneTopLevel": "Nenhum (Nível Superior)",
+    "preview": "Prévia",
+    "name": "Nome",
+    "color": "Cor",
+    "category": "Categoria",
+    "categories": "Categorias"
+  },
+  "messages": {
+    "success": "Sucesso",
+    "error": "Erro",
+    "saved": "Salvo com sucesso",
+    "deleted": "Excluído com sucesso",
+    "updated": "Atualizado com sucesso"
+  },
+  "time": {
+    "justNow": "Agora mesmo",
+    "minutesAgo": "{{count}} minuto atrás",
+    "minutesAgo_other": "{{count}} minutos atrás",
+    "hoursAgo": "{{count}} hora atrás",
+    "hoursAgo_other": "{{count}} horas atrás",
+    "daysAgo": "{{count}} dia atrás",
+    "daysAgo_other": "{{count}} dias atrás"
+  }
+}

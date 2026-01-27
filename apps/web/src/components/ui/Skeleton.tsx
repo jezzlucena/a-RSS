@@ -42,6 +42,18 @@ export function SkeletonCircle({ className, size = 'md' }: { className?: string;
   return <Skeleton className={cn("rounded-full", sizes[size], className)} />;
 }
 
+// Article card skeleton for compact layout
+export function ArticleCardSkeletonCompact() {
+  return (
+    <div className="flex items-center gap-3 px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+      <Skeleton className="w-2 h-2 rounded-full flex-shrink-0" />
+      <Skeleton className="w-4 h-4 rounded flex-shrink-0" />
+      <Skeleton className="h-4 flex-1" />
+      <Skeleton className="h-3 w-12 flex-shrink-0" />
+    </div>
+  );
+}
+
 // Article card skeleton for list layout
 export function ArticleCardSkeletonList() {
   return (
@@ -137,12 +149,13 @@ export function ArticleCardSkeletonMagazine() {
 
 // Loading state for article list
 interface ArticleListSkeletonProps {
-  layout: 'list' | 'cards' | 'magazine';
+  layout: 'compact' | 'list' | 'cards' | 'magazine';
   count?: number;
 }
 
 export function ArticleListSkeleton({ layout, count = 5 }: ArticleListSkeletonProps) {
   const SkeletonComponent = {
+    compact: ArticleCardSkeletonCompact,
     list: ArticleCardSkeletonList,
     cards: ArticleCardSkeletonCard,
     magazine: ArticleCardSkeletonMagazine,
@@ -151,6 +164,16 @@ export function ArticleListSkeleton({ layout, count = 5 }: ArticleListSkeletonPr
   if (layout === 'cards') {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Array.from({ length: count }).map((_, i) => (
+          <SkeletonComponent key={i} />
+        ))}
+      </div>
+    );
+  }
+
+  if (layout === 'compact') {
+    return (
+      <div className="divide-y divide-gray-200 dark:divide-gray-700">
         {Array.from({ length: count }).map((_, i) => (
           <SkeletonComponent key={i} />
         ))}

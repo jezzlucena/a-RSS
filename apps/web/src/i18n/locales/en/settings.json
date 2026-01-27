@@ -1,0 +1,91 @@
+{
+  "title": "Settings",
+  "subtitle": "Customize your reading experience",
+  "backToArticles": "Back to Articles",
+  "appearance": {
+    "title": "Appearance",
+    "description": "Choose how aRSS looks to you",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "accentColor": {
+    "title": "Accent Color",
+    "description": "Pick a color that reflects your style",
+    "custom": "Custom"
+  },
+  "feedLayout": {
+    "title": "Feed Layout",
+    "description": "Choose how articles are displayed in the feed",
+    "compact": "Compact",
+    "list": "List",
+    "cards": "Cards",
+    "magazine": "Magazine"
+  },
+  "articleView": {
+    "title": "Article View",
+    "description": "How articles open when you click them",
+    "splitHorizontal": "Horizontal Split",
+    "splitVertical": "Vertical Split",
+    "horizontalSplit": "Horizontal Split",
+    "verticalSplit": "Vertical Split",
+    "overlay": "Overlay",
+    "full": "Full"
+  },
+  "reading": {
+    "title": "Reading",
+    "description": "Customize your reading experience",
+    "fontSizeLabel": "Font Size",
+    "fontSize": "Font Size",
+    "small": "Small",
+    "medium": "Medium",
+    "large": "Large"
+  },
+  "language": {
+    "title": "Language",
+    "description": "Choose your preferred language"
+  },
+  "security": {
+    "title": "Security",
+    "description": "Update your password",
+    "currentPassword": "Current Password",
+    "currentPasswordPlaceholder": "Enter current password",
+    "newPassword": "New Password",
+    "newPasswordPlaceholder": "Enter new password (min. 8 characters)",
+    "confirmPassword": "Confirm New Password",
+    "confirmNewPassword": "Confirm New Password",
+    "confirmPasswordPlaceholder": "Confirm new password",
+    "changePassword": "Change Password",
+    "changePasswordButton": "Change Password",
+    "changingPassword": "Changing Password...",
+    "passwordChanged": "Password changed successfully",
+    "passwordChangeFailed": "Failed to change password",
+    "fillAllFields": "Please fill in all password fields",
+    "passwordMinLength": "New password must be at least 8 characters",
+    "passwordsNoMatch": "New passwords do not match"
+  },
+  "passwordMessages": {
+    "success": "Password changed successfully",
+    "failed": "Failed to change password",
+    "fillAllFields": "Please fill in all password fields",
+    "minLength": "New password must be at least 8 characters",
+    "noMatch": "New passwords do not match"
+  },
+  "data": {
+    "title": "Data",
+    "opml": "Import / Export OPML"
+  },
+  "techStack": {
+    "title": "Tech Stack",
+    "description": "Built with modern, open-source technologies"
+  },
+  "about": {
+    "title": "About",
+    "subtitle": "aRSS - another RSS Software Solution",
+    "description": "aRSS is a modern, open-source RSS reader focused on providing a beautiful and intuitive reading experience. Stay updated with all your favorite content in one place.",
+    "text": "aRSS is a modern, open-source RSS reader focused on providing a beautiful and intuitive reading experience. Stay updated with all your favorite content in one place.",
+    "viewOnGitHub": "View on GitHub",
+    "viewOnGithub": "View on GitHub",
+    "sponsor": "Sponsor"
+  }
+}

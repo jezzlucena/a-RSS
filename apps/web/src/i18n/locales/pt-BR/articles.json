@@ -1,0 +1,73 @@
+{
+  "selectArticle": "Selecione um artigo para ler",
+  "selectToRead": "Selecione um artigo para ler",
+  "notFound": "Artigo não encontrado",
+  "readingTime": "{{minutes}} min de leitura",
+  "by": "Por {{author}}",
+  "byAuthor": "Por {{author}}",
+  "readOriginal": "Ler artigo original em {{domain}}",
+  "readOriginalOn": "Ler artigo original em {{domain}}",
+  "back": "Voltar",
+  "markAsRead": "Marcar como lido",
+  "markAsUnread": "Marcar como não lido",
+  "save": "Salvar",
+  "saved": "Salvo",
+  "saveForLater": "Salvar para depois",
+  "removeFromSaved": "Remover dos salvos",
+  "openOriginal": "Abrir original",
+  "actions": {
+    "markAsRead": "Marcar como lido",
+    "markAsUnread": "Marcar como não lido",
+    "save": "Salvar",
+    "saved": "Salvo",
+    "saveForLater": "Salvar para depois",
+    "removeFromSaved": "Remover dos salvos",
+    "openOriginal": "Abrir original"
+  },
+  "fontSize": {
+    "title": "Tamanho da fonte",
+    "small": "Pequeno",
+    "medium": "Médio",
+    "large": "Grande"
+  },
+  "fontSizes": {
+    "small": "Pequeno",
+    "medium": "Médio",
+    "large": "Grande"
+  },
+  "focusMode": {
+    "enter": "Entrar no modo foco",
+    "exit": "Sair do modo foco"
+  },
+  "messages": {
+    "saved": "Artigo salvo",
+    "unsaved": "Artigo removido dos salvos",
+    "removed": "Artigo removido dos salvos",
+    "failedToMarkRead": "Falha ao marcar artigo como lido",
+    "failedToMarkUnread": "Falha ao marcar artigo como não lido",
+    "failedToSave": "Falha ao atualizar status de salvamento"
+  },
+  "time": {
+    "justNow": "agora mesmo",
+    "minutesAgo": "{{count}}min atrás",
+    "hoursAgo": "{{count}}h atrás",
+    "daysAgo": "{{count}}d atrás",
+    "weeksAgo": "{{count}}sem atrás",
+    "monthsAgo": "{{count}}mês atrás",
+    "yearsAgo": "{{count}}ano atrás",
+    "lessThanOneMinRead": "< 1 min de leitura",
+    "oneMinRead": "1 min de leitura",
+    "minRead": "{{count}} min de leitura"
+  },
+  "emptyState": {
+    "title": "Nenhum artigo",
+    "noSaved": "Nenhum artigo salvo ainda.",
+    "allCaughtUp": "Tudo em dia!",
+    "noArticles": "Nenhum artigo para exibir."
+  },
+  "sort": {
+    "label": "Ordenar",
+    "newestFirst": "Mais recentes",
+    "oldestFirst": "Mais antigos"
+  }
+}

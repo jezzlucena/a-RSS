@@ -22,6 +22,11 @@ const refreshSchema = z.object({
   refreshToken: z.string().min(1, 'Refresh token is required'),
 });
 
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+});
+
 // POST /api/v1/auth/register
 router.post('/register', authLimiter, validate(registerSchema), async (req, res, next) => {
   try {
@@ -81,6 +86,19 @@ router.get('/me', authenticate, async (req, res, next) => {
     res.json({
       success: true,
       data: user,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/v1/auth/change-password
+router.post('/change-password', authenticate, validate(changePasswordSchema), async (req, res, next) => {
+  try {
+    await authService.changePassword(req.user!.userId, req.body);
+    res.json({
+      success: true,
+      message: 'Password changed successfully',
     });
   } catch (error) {
     next(error);

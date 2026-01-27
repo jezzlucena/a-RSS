@@ -39,7 +39,7 @@ services:
   # API Backend
   api:
     build:
-      context: ..
+      context: .
       dockerfile: apps/api/Dockerfile
     container_name: arss-api
     restart: always
@@ -67,7 +67,7 @@ services:
   # Web Frontend
   web:
     build:
-      context: ..
+      context: .
       dockerfile: apps/web/Dockerfile
       args:
         VITE_API_URL: /api/v1

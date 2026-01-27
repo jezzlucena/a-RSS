@@ -12,8 +12,8 @@ export interface UserPreferences {
   userId: string;
   theme: 'light' | 'dark' | 'system';
   accentColor: string;
-  layout: 'list' | 'cards' | 'magazine';
-  articleView: 'split' | 'overlay' | 'full';
+  layout: 'compact' | 'list' | 'cards' | 'magazine';
+  articleView: 'split-horizontal' | 'split-vertical' | 'overlay' | 'full';
   fontSize: 'small' | 'medium' | 'large';
   createdAt: Date;
   updatedAt: Date;

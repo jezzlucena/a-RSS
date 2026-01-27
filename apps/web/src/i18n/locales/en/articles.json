@@ -1,0 +1,73 @@
+{
+  "selectArticle": "Select an article to read",
+  "selectToRead": "Select an article to read",
+  "notFound": "Article not found",
+  "readingTime": "{{minutes}} min read",
+  "by": "By {{author}}",
+  "byAuthor": "By {{author}}",
+  "readOriginal": "Read original article on {{domain}}",
+  "readOriginalOn": "Read original article on {{domain}}",
+  "back": "Back",
+  "markAsRead": "Mark as read",
+  "markAsUnread": "Mark as unread",
+  "save": "Save",
+  "saved": "Saved",
+  "saveForLater": "Save for later",
+  "removeFromSaved": "Remove from saved",
+  "openOriginal": "Open original",
+  "actions": {
+    "markAsRead": "Mark as read",
+    "markAsUnread": "Mark as unread",
+    "save": "Save",
+    "saved": "Saved",
+    "saveForLater": "Save for later",
+    "removeFromSaved": "Remove from saved",
+    "openOriginal": "Open original"
+  },
+  "fontSize": {
+    "title": "Font size",
+    "small": "Small",
+    "medium": "Medium",
+    "large": "Large"
+  },
+  "fontSizes": {
+    "small": "Small",
+    "medium": "Medium",
+    "large": "Large"
+  },
+  "focusMode": {
+    "enter": "Enter focus mode",
+    "exit": "Exit focus mode"
+  },
+  "messages": {
+    "saved": "Article saved",
+    "unsaved": "Article removed from saved",
+    "removed": "Article removed from saved",
+    "failedToMarkRead": "Failed to mark article as read",
+    "failedToMarkUnread": "Failed to mark article as unread",
+    "failedToSave": "Failed to update saved status"
+  },
+  "time": {
+    "justNow": "just now",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago",
+    "weeksAgo": "{{count}}w ago",
+    "monthsAgo": "{{count}}mo ago",
+    "yearsAgo": "{{count}}y ago",
+    "lessThanOneMinRead": "< 1 min read",
+    "oneMinRead": "1 min read",
+    "minRead": "{{count}} min read"
+  },
+  "emptyState": {
+    "title": "No articles",
+    "noSaved": "No saved articles yet.",
+    "allCaughtUp": "All caught up!",
+    "noArticles": "No articles to display."
+  },
+  "sort": {
+    "label": "Sort",
+    "newestFirst": "Newest first",
+    "oldestFirst": "Oldest first"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "generic": {
+    "title": "Something went wrong",
+    "message": "We encountered an unexpected error. Please try again.",
+    "details": "Error Details"
+  },
+  "article": {
+    "failedToLoad": "Failed to load article content"
+  },
+  "feed": {
+    "failedToLoad": "Failed to load feeds"
+  },
+  "compact": {
+    "failedToLoad": "Failed to load"
+  }
+}

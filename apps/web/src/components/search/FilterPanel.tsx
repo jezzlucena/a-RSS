@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Filter, X, Calendar, Folder, Rss, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui';
@@ -25,6 +26,7 @@ export function FilterPanel({
   onClear,
   className,
 }: FilterPanelProps) {
+  const { t } = useTranslation('search');
   const [isExpanded, setIsExpanded] = useState(false);
   const { data: feeds = [] } = useFeeds();
   const { data: categories = [] } = useCategories();
@@ -64,7 +66,7 @@ export function FilterPanel({
         )}
       >
         <Filter className="w-4 h-4" />
-        Filters
+        {t('filters.title')}
         {activeFilterCount > 0 && (
           <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary/20 rounded-full">
             {activeFilterCount}
@@ -95,7 +97,7 @@ export function FilterPanel({
             <div className="p-4 space-y-4">
               {/* Header */}
               <div className="flex items-center justify-between">
-                <h3 className="font-medium">Filters</h3>
+                <h3 className="font-medium">{t('filters.title')}</h3>
                 {activeFilterCount > 0 && (
                   <Button
                     variant="ghost"
@@ -104,7 +106,7 @@ export function FilterPanel({
                     className="h-7 text-xs text-muted-foreground hover:text-foreground"
                   >
                     <X className="w-3 h-3 mr-1" />
-                    Clear all
+                    {t('filters.clearAll')}
                   </Button>
                 )}
               </div>
@@ -113,7 +115,7 @@ export function FilterPanel({
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <Calendar className="w-4 h-4" />
-                  Date Range
+                  {t('filters.dateRange')}
                 </label>
                 <div className="flex gap-2">
                   <div className="flex-1">
@@ -126,10 +128,9 @@ export function FilterPanel({
                         'bg-muted/50 border border-border/50',
                         'focus:outline-none focus:ring-2 focus:ring-primary/50'
                       )}
-                      placeholder="Start date"
                     />
                   </div>
-                  <span className="flex items-center text-muted-foreground">to</span>
+                  <span className="flex items-center text-muted-foreground">{t('filters.to')}</span>
                   <div className="flex-1">
                     <input
                       type="date"
@@ -140,7 +141,6 @@ export function FilterPanel({
                         'bg-muted/50 border border-border/50',
                         'focus:outline-none focus:ring-2 focus:ring-primary/50'
                       )}
-                      placeholder="End date"
                     />
                   </div>
                 </div>
@@ -150,7 +150,7 @@ export function FilterPanel({
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <Folder className="w-4 h-4" />
-                  Category
+                  {t('filters.category')}
                 </label>
                 <select
                   value={filters.categoryId || ''}
@@ -161,7 +161,7 @@ export function FilterPanel({
                     'focus:outline-none focus:ring-2 focus:ring-primary/50'
                   )}
                 >
-                  <option value="">All categories</option>
+                  <option value="">{t('filters.allCategories')}</option>
                   {categories.map((category) => (
                     <option key={category.id} value={category.id}>
                       {category.name}
@@ -174,7 +174,7 @@ export function FilterPanel({
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <Rss className="w-4 h-4" />
-                  Feed
+                  {t('filters.feed')}
                 </label>
                 <select
                   value={filters.feedId || ''}
@@ -185,7 +185,7 @@ export function FilterPanel({
                     'focus:outline-none focus:ring-2 focus:ring-primary/50'
                   )}
                 >
-                  <option value="">All feeds</option>
+                  <option value="">{t('filters.allFeeds')}</option>
                   {feeds.map((subscription) => (
                     <option key={subscription.feedId} value={subscription.feedId}>
                       {subscription.customTitle || subscription.feed.title}
@@ -197,17 +197,17 @@ export function FilterPanel({
               {/* Quick Date Presets */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">
-                  Quick presets
+                  {t('filters.quickPresets')}
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { label: 'Today', days: 0 },
-                    { label: 'Week', days: 7 },
-                    { label: 'Month', days: 30 },
-                    { label: '3 Months', days: 90 },
+                    { label: t('filters.today'), days: 0 },
+                    { label: t('filters.week'), days: 7 },
+                    { label: t('filters.month'), days: 30 },
+                    { label: t('filters.threeMonths'), days: 90 },
                   ].map(({ label, days }) => (
                     <Button
-                      key={label}
+                      key={days}
                       variant="outline"
                       size="sm"
                       className="h-7 text-xs"

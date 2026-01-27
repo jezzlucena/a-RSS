@@ -1,0 +1,16 @@
+{
+  "title": "Keyboard Shortcuts",
+  "helpText": "Press ? to show this help",
+  "descriptions": {
+    "nextArticle": "Next article",
+    "previousArticle": "Previous article",
+    "openArticle": "Open article",
+    "closeArticle": "Close article",
+    "markAsRead": "Mark as read/unread",
+    "toggleSaved": "Save/unsave article",
+    "openOriginal": "Open original link",
+    "refresh": "Refresh feeds",
+    "search": "Focus search",
+    "showShortcuts": "Show keyboard shortcuts"
+  }
+}

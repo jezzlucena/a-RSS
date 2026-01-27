@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { X, Upload, Download, FileText, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import {
   Button,
@@ -18,6 +19,7 @@ interface OPMLModalProps {
 }
 
 export function OPMLModal({ isOpen, onClose }: OPMLModalProps) {
+  const { t } = useTranslation('feeds');
   const [activeTab, setActiveTab] = useState<'import' | 'export'>('import');
   const [opmlContent, setOpmlContent] = useState('');
   const [importResult, setImportResult] = useState<{
@@ -96,12 +98,13 @@ export function OPMLModal({ isOpen, onClose }: OPMLModalProps) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={handleClose}
           >
-            <Card className="w-full max-w-lg">
+            <Card className="w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-xl flex items-center gap-2">
                   <FileText className="w-5 h-5" />
-                  OPML Import / Export
+                  {t('opml.title')}
                 </CardTitle>
                 <Button variant="ghost" size="icon-sm" onClick={handleClose}>
                   <X className="w-4 h-4" />
@@ -121,7 +124,7 @@ export function OPMLModal({ isOpen, onClose }: OPMLModalProps) {
                     )}
                   >
                     <Upload className="w-4 h-4" />
-                    Import
+                    {t('opml.import')}
                   </button>
                   <button
                     onClick={() => setActiveTab('export')}
@@ -133,7 +136,7 @@ export function OPMLModal({ isOpen, onClose }: OPMLModalProps) {
                     )}
                   >
                     <Download className="w-4 h-4" />
-                    Export
+                    {t('opml.export')}
                   </button>
                 </div>
 
@@ -141,7 +144,7 @@ export function OPMLModal({ isOpen, onClose }: OPMLModalProps) {
                 {activeTab === 'import' && (
                   <div className="space-y-4">
                     <p className="text-sm text-gray-500">
-                      Import your RSS subscriptions from another reader using an OPML file.
+                      {t('opml.importDescription')}
                     </p>
 
                     {/* File Upload */}
@@ -150,8 +153,8 @@ export function OPMLModal({ isOpen, onClose }: OPMLModalProps) {
                       className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg p-6 text-center cursor-pointer hover:border-accent-500 transition-colors"
                     >
                       <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                      <p className="text-sm font-medium">Click to select OPML file</p>
-                      <p className="text-xs text-gray-400 mt-1">or drag and drop</p>
+                      <p className="text-sm font-medium">{t('opml.clickToSelect')}</p>
+                      <p className="text-xs text-gray-400 mt-1">{t('opml.orDragAndDrop')}</p>
                       <input
                         ref={fileInputRef}
                         type="file"
@@ -164,7 +167,7 @@ export function OPMLModal({ isOpen, onClose }: OPMLModalProps) {
                     {/* OPML Preview */}
                     {opmlContent && (
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">OPML Content</label>
+                        <label className="text-sm font-medium">{t('opml.content')}</label>
                         <textarea
                           value={opmlContent}
                           onChange={(e) => setOpmlContent(e.target.value)}
@@ -179,20 +182,20 @@ export function OPMLModal({ isOpen, onClose }: OPMLModalProps) {
                       <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800 space-y-2">
                         <div className="flex items-center gap-2">
                           <CheckCircle className="w-5 h-5 text-green-500" />
-                          <span className="font-medium">Import Complete</span>
+                          <span className="font-medium">{t('opml.importComplete')}</span>
                         </div>
                         <div className="text-sm space-y-1">
                           <p className="text-green-600 dark:text-green-400">
-                            {importResult.imported} feeds imported
+                            {t('opml.feedsImported', { count: importResult.imported })}
                           </p>
                           {importResult.skipped > 0 && (
                             <p className="text-yellow-600 dark:text-yellow-400">
-                              {importResult.skipped} feeds skipped (already subscribed)
+                              {t('opml.feedsSkipped', { count: importResult.skipped })}
                             </p>
                           )}
                           {importResult.failed > 0 && (
                             <p className="text-red-600 dark:text-red-400">
-                              {importResult.failed} feeds failed to import
+                              {t('opml.feedsFailed', { count: importResult.failed })}
                             </p>
                           )}
                         </div>
@@ -213,7 +216,7 @@ export function OPMLModal({ isOpen, onClose }: OPMLModalProps) {
                         <p className="text-sm">
                           {importOPML.error instanceof Error
                             ? importOPML.error.message
-                            : 'Failed to import OPML'}
+                            : t('opml.importFailed')}
                         </p>
                       </div>
                     )}
@@ -224,14 +227,14 @@ export function OPMLModal({ isOpen, onClose }: OPMLModalProps) {
                 {activeTab === 'export' && (
                   <div className="space-y-4">
                     <p className="text-sm text-gray-500">
-                      Export all your RSS subscriptions to an OPML file that can be imported into other readers.
+                      {t('opml.exportDescription')}
                     </p>
 
                     <div className="p-6 rounded-lg bg-gray-50 dark:bg-gray-800 text-center">
                       <FileText className="w-12 h-12 mx-auto mb-3 text-gray-400" />
                       <p className="text-sm font-medium mb-1">arss-subscriptions.opml</p>
                       <p className="text-xs text-gray-400">
-                        Contains all your feeds and categories
+                        {t('opml.fileDescription')}
                       </p>
                     </div>
 
@@ -242,7 +245,7 @@ export function OPMLModal({ isOpen, onClose }: OPMLModalProps) {
                         <p className="text-sm">
                           {exportOPML.error instanceof Error
                             ? exportOPML.error.message
-                            : 'Failed to export OPML'}
+                            : t('opml.exportFailed')}
                         </p>
                       </div>
                     )}
@@ -252,7 +255,7 @@ export function OPMLModal({ isOpen, onClose }: OPMLModalProps) {
 
               <CardFooter className="flex gap-2 justify-end">
                 <Button variant="ghost" onClick={handleClose}>
-                  {importResult ? 'Done' : 'Cancel'}
+                  {importResult ? t('opml.done') : t('opml.cancel')}
                 </Button>
                 {activeTab === 'import' ? (
                   <Button
@@ -262,12 +265,12 @@ export function OPMLModal({ isOpen, onClose }: OPMLModalProps) {
                     {importOPML.isPending ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Importing...
+                        {t('opml.importing')}
                       </>
                     ) : (
                       <>
                         <Upload className="w-4 h-4" />
-                        Import Feeds
+                        {t('opml.importFeeds')}
                       </>
                     )}
                   </Button>
@@ -279,12 +282,12 @@ export function OPMLModal({ isOpen, onClose }: OPMLModalProps) {
                     {exportOPML.isPending ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Exporting...
+                        {t('opml.exporting')}
                       </>
                     ) : (
                       <>
                         <Download className="w-4 h-4" />
-                        Download OPML
+                        {t('opml.downloadOpml')}
                       </>
                     )}
                   </Button>

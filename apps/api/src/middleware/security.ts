@@ -4,11 +4,11 @@ import { env } from '../config/env.js';
 
 /**
  * General API rate limiter
- * 100 requests per 15 minutes per IP
+ * 500 requests per 15 minutes per IP (more lenient for SPAs)
  */
 export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: env.NODE_ENV === 'production' ? 500 : 10000, // Very lenient in development
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -23,11 +23,11 @@ export const generalLimiter = rateLimit({
 
 /**
  * Stricter rate limiter for authentication endpoints
- * 10 attempts per 15 minutes per IP
+ * 20 attempts per 15 minutes per IP
  */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: env.NODE_ENV === 'production' ? 20 : 1000, // Very lenient in development
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -43,11 +43,11 @@ export const authLimiter = rateLimit({
 
 /**
  * Rate limiter for password reset
- * 3 attempts per hour per IP
+ * 5 attempts per hour per IP
  */
 export const passwordResetLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 3,
+  max: env.NODE_ENV === 'production' ? 5 : 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -58,11 +58,11 @@ export const passwordResetLimiter = rateLimit({
 
 /**
  * Rate limiter for feed operations (fetching, adding)
- * 30 requests per minute per IP
+ * 60 requests per minute per IP
  */
 export const feedLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 30,
+  max: env.NODE_ENV === 'production' ? 60 : 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

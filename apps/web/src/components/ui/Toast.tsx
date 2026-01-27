@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react';
 import { useToastStore, Toast as ToastType, ToastType as ToastVariant } from '@/stores/toastStore';
@@ -24,9 +25,23 @@ const iconColors: Record<ToastVariant, string> = {
   warning: 'text-yellow-500',
 };
 
+const progressColors: Record<ToastVariant, string> = {
+  success: 'bg-green-500',
+  error: 'bg-red-500',
+  info: 'bg-blue-500',
+  warning: 'bg-yellow-500',
+};
+
 function ToastItem({ toast }: { toast: ToastType }) {
   const { removeToast } = useToastStore();
   const Icon = icons[toast.type];
+  const duration = toast.duration || 5000;
+  const [isPaused, setIsPaused] = useState(false);
+  const progressRef = useRef<HTMLDivElement>(null);
+
+  const handleAnimationEnd = () => {
+    removeToast(toast.id);
+  };
 
   return (
     <motion.div
@@ -34,8 +49,10 @@ function ToastItem({ toast }: { toast: ToastType }) {
       initial={{ opacity: 0, y: 50, scale: 0.9 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 20, scale: 0.9 }}
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
       className={cn(
-        'flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-lg shadow-lg',
+        'relative flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-lg shadow-lg overflow-hidden',
         variants[toast.type]
       )}
     >
@@ -47,6 +64,21 @@ function ToastItem({ toast }: { toast: ToastType }) {
       >
         <X className="w-4 h-4" />
       </button>
+
+      {/* Countdown progress bar */}
+      {duration > 0 && (
+        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-black/5 dark:bg-white/5 overflow-hidden">
+          <div
+            ref={progressRef}
+            className={cn('h-full w-full origin-left', progressColors[toast.type])}
+            style={{
+              animation: `toast-progress ${duration}ms linear forwards`,
+              animationPlayState: isPaused ? 'paused' : 'running',
+            }}
+            onAnimationEnd={handleAnimationEnd}
+          />
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -55,14 +87,28 @@ export function ToastContainer() {
   const { toasts } = useToastStore();
 
   return (
-    <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
-      <AnimatePresence mode="popLayout">
-        {toasts.map((toast) => (
-          <div key={toast.id} className="pointer-events-auto">
-            <ToastItem toast={toast} />
-          </div>
-        ))}
-      </AnimatePresence>
-    </div>
+    <>
+      {/* CSS animation keyframes */}
+      <style>{`
+        @keyframes toast-progress {
+          from {
+            transform: scaleX(1);
+          }
+          to {
+            transform: scaleX(0);
+          }
+        }
+      `}</style>
+
+      <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+        <AnimatePresence mode="popLayout">
+          {toasts.map((toast) => (
+            <div key={toast.id} className="pointer-events-auto">
+              <ToastItem toast={toast} />
+            </div>
+          ))}
+        </AnimatePresence>
+      </div>
+    </>
   );
 }

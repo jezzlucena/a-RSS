@@ -1,5 +1,15 @@
 import DOMPurify, { Config } from 'dompurify';
 
+/**
+ * Decode HTML entities that may have been double-encoded
+ * This handles cases where RSS feeds return escaped HTML
+ */
+function decodeHtmlEntities(html: string): string {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = html;
+  return textarea.value;
+}
+
 // Configure DOMPurify for article content
 const config: Config = {
   // Allow common HTML elements
@@ -53,9 +63,12 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
 
 /**
  * Sanitize HTML content for safe rendering
+ * Decodes HTML entities first to handle double-encoded content from RSS feeds
  */
 export function sanitizeHtml(html: string): string {
-  return DOMPurify.sanitize(html, config) as string;
+  // Decode HTML entities in case content was double-encoded
+  const decoded = decodeHtmlEntities(html);
+  return DOMPurify.sanitize(decoded, config) as string;
 }
 
 /**

@@ -45,7 +45,7 @@ export const userPreferences = pgTable('user_preferences', {
   theme: varchar('theme', { length: 20 }).default('system').notNull(),
   accentColor: varchar('accent_color', { length: 20 }).default('#3b82f6').notNull(),
   layout: varchar('layout', { length: 20 }).default('list').notNull(),
-  articleView: varchar('article_view', { length: 20 }).default('split').notNull(),
+  articleView: varchar('article_view', { length: 20 }).default('split-vertical').notNull(),
   fontSize: varchar('font_size', { length: 20 }).default('medium').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),

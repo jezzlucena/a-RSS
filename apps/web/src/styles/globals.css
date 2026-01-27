@@ -65,6 +65,19 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
+  /* Font size settings - applied to html element */
+  html.font-size-small {
+    font-size: 14px;
+  }
+
+  html.font-size-medium {
+    font-size: 16px;
+  }
+
+  html.font-size-large {
+    font-size: 18px;
+  }
+
   /* Custom scrollbar */
   ::-webkit-scrollbar {
     @apply w-2 h-2;

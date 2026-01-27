@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import i18n from '@/i18n';
 import api from '@/lib/api';
 import { useFeedStore } from '@/stores/feedStore';
 import { toast } from '@/stores/toastStore';
@@ -36,10 +37,10 @@ export function useAddFeed() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['feeds'] });
       queryClient.invalidateQueries({ queryKey: ['articles'] });
-      toast.success(`Added "${data.feed.title}"`);
+      toast.success(i18n.t('feeds:messages.added', { title: data.feed.title }));
     },
     onError: () => {
-      toast.error('Failed to add feed');
+      toast.error(i18n.t('feeds:messages.addFailed'));
     },
   });
 }
@@ -77,10 +78,10 @@ export function useDeleteFeed() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feeds'] });
       queryClient.invalidateQueries({ queryKey: ['articles'] });
-      toast.success('Feed removed');
+      toast.success(i18n.t('feeds:messages.removed'));
     },
     onError: () => {
-      toast.error('Failed to remove feed');
+      toast.error(i18n.t('feeds:messages.removeFailed'));
     },
   });
 }
@@ -95,10 +96,10 @@ export function useRefreshFeed() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['articles'] });
-      toast.success('Feed refreshed');
+      toast.success(i18n.t('feeds:messages.refreshed'));
     },
     onError: () => {
-      toast.error('Failed to refresh feed');
+      toast.error(i18n.t('feeds:messages.refreshFailed'));
     },
   });
 }

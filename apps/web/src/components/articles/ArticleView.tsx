@@ -1,6 +1,9 @@
+import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import {
   X,
+  ArrowLeft,
   ExternalLink,
   Bookmark,
   BookmarkCheck,
@@ -13,16 +16,16 @@ import {
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Button, Card, CardContent, Spinner } from '@/components/ui';
 import { ArticleErrorBoundary } from '@/components/common';
-import { useArticle, useMarkAsRead, useMarkAsUnread, useToggleSaved } from '@/hooks/useArticles';
+import { useArticle, useMarkAsRead, useMarkAsUnread, useToggleSaved, useTimeFormat } from '@/hooks';
 import { useUIStore } from '@/stores/uiStore';
-import { formatDate, formatRelativeTime, getDomain, calculateReadingTime, formatReadingTime } from '@arss/utils';
+import { formatDate, getDomain, calculateReadingTime } from '@arss/utils';
 import { cn } from '@/lib/utils';
 import { sanitizeForReact } from '@/lib/sanitize';
 
 interface ArticleViewProps {
   articleId: string | null;
   onClose: () => void;
-  mode?: 'split' | 'overlay' | 'full';
+  mode?: 'split' | 'split-horizontal' | 'split-vertical' | 'overlay' | 'full';
 }
 
 const fontSizeClasses = {
@@ -31,23 +34,36 @@ const fontSizeClasses = {
   large: 'prose-lg',
 };
 
-const fontSizeLabels = {
-  small: 'Small',
-  medium: 'Medium',
-  large: 'Large',
-};
-
 export function ArticleView({ articleId, onClose, mode = 'split' }: ArticleViewProps) {
+  const { t } = useTranslation('articles');
   const { data: article, isLoading } = useArticle(articleId);
   const markAsRead = useMarkAsRead();
   const markAsUnread = useMarkAsUnread();
   const toggleSaved = useToggleSaved();
   const { fontSize, setFontSize, focusMode, toggleFocusMode } = useUIStore();
+  const { formatRelativeTime, formatReadingTime } = useTimeFormat();
+
+  const fontSizeLabels = {
+    small: t('fontSize.small'),
+    medium: t('fontSize.medium'),
+    large: t('fontSize.large'),
+  };
+
+  // Track which article IDs have been auto-marked as read in this session
+  const autoMarkedRef = useRef<Set<string>>(new Set());
+
+  // Auto-mark article as read when first viewed
+  useEffect(() => {
+    if (article && !article.isRead && !autoMarkedRef.current.has(article.id)) {
+      autoMarkedRef.current.add(article.id);
+      markAsRead.mutate(article.id);
+    }
+  }, [article?.id]);
 
   if (!articleId) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400">
-        <p>Select an article to read</p>
+        <p>{t('selectToRead')}</p>
       </div>
     );
   }
@@ -63,7 +79,7 @@ export function ArticleView({ articleId, onClose, mode = 'split' }: ArticleViewP
   if (!article) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400">
-        <p>Article not found</p>
+        <p>{t('notFound')}</p>
       </div>
     );
   }
@@ -83,6 +99,17 @@ export function ArticleView({ articleId, onClose, mode = 'split' }: ArticleViewP
         focusMode && "opacity-0 hover:opacity-100 transition-opacity duration-300"
       )}>
         <div className="flex items-center gap-2">
+          {mode === 'full' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="mr-2"
+            >
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              {t('back')}
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon-sm"
@@ -91,7 +118,7 @@ export function ArticleView({ articleId, onClose, mode = 'split' }: ArticleViewP
                 ? markAsUnread.mutate(article.id)
                 : markAsRead.mutate(article.id)
             }
-            title={article.isRead ? 'Mark as unread' : 'Mark as read'}
+            title={article.isRead ? t('markAsUnread') : t('markAsRead')}
           >
             <Mail
               className={cn(
@@ -104,7 +131,7 @@ export function ArticleView({ articleId, onClose, mode = 'split' }: ArticleViewP
             variant="ghost"
             size="icon-sm"
             onClick={() => toggleSaved.mutate(article.id)}
-            title={article.isSaved ? 'Remove from saved' : 'Save for later'}
+            title={article.isSaved ? t('removeFromSaved') : t('saveForLater')}
           >
             {article.isSaved ? (
               <BookmarkCheck className="w-4 h-4 text-accent-500" />
@@ -121,7 +148,7 @@ export function ArticleView({ articleId, onClose, mode = 'split' }: ArticleViewP
               href={article.url}
               target="_blank"
               rel="noopener noreferrer"
-              title="Open original"
+              title={t('openOriginal')}
             >
               <ExternalLink className="w-4 h-4" />
             </a>
@@ -130,7 +157,7 @@ export function ArticleView({ articleId, onClose, mode = 'split' }: ArticleViewP
           {/* Font Size Dropdown */}
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
-              <Button variant="ghost" size="icon-sm" title="Font size">
+              <Button variant="ghost" size="icon-sm" title={t('fontSize.title')}>
                 <Type className="w-4 h-4" />
               </Button>
             </DropdownMenu.Trigger>
@@ -162,7 +189,7 @@ export function ArticleView({ articleId, onClose, mode = 'split' }: ArticleViewP
             variant="ghost"
             size="icon-sm"
             onClick={toggleFocusMode}
-            title={focusMode ? 'Exit focus mode' : 'Enter focus mode'}
+            title={focusMode ? t('focusMode.exit') : t('focusMode.enter')}
           >
             {focusMode ? (
               <Minimize2 className="w-4 h-4" />
@@ -183,15 +210,6 @@ export function ArticleView({ articleId, onClose, mode = 'split' }: ArticleViewP
         "flex-1 overflow-y-auto",
         focusMode ? "px-8 py-12 max-w-3xl mx-auto" : "p-6"
       )}>
-        {/* Hero image */}
-        {article.imageUrl && !focusMode && (
-          <img
-            src={article.imageUrl}
-            alt=""
-            className="w-full h-64 object-cover rounded-xl mb-6"
-          />
-        )}
-
         {/* Meta */}
         <div className={cn(
           "flex items-center gap-4 mb-4 text-sm text-gray-500",
@@ -236,7 +254,7 @@ export function ArticleView({ articleId, onClose, mode = 'split' }: ArticleViewP
           "flex items-center gap-4 mb-8 text-sm text-gray-500",
           focusMode && "justify-center"
         )}>
-          {article.author && <span>By {article.author}</span>}
+          {article.author && <span>{t('byAuthor', { author: article.author })}</span>}
           <span>{formatDate(article.publishedAt)}</span>
           {!focusMode && (
             <a
@@ -257,6 +275,7 @@ export function ArticleView({ articleId, onClose, mode = 'split' }: ArticleViewP
             fontSizeClasses[fontSize],
             // Enhanced prose styling
             "prose-headings:font-bold prose-headings:tracking-tight",
+            "prose-p:indent-8 prose-p:mt-4 [&>p:first-of-type]:indent-0 [&>p:first-of-type]:mt-0",
             "prose-a:text-accent-500 prose-a:no-underline hover:prose-a:underline",
             "prose-img:rounded-xl prose-img:shadow-lg",
             "prose-blockquote:border-l-accent-500 prose-blockquote:bg-gray-50 dark:prose-blockquote:bg-gray-800/50 prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg",
@@ -278,7 +297,7 @@ export function ArticleView({ articleId, onClose, mode = 'split' }: ArticleViewP
                 rel="noopener noreferrer"
                 className="text-accent-500 hover:underline text-sm"
               >
-                Read original article on {getDomain(article.url)}
+                {t('readOriginalOn', { domain: getDomain(article.url) })}
               </a>
               <div className="flex items-center gap-2">
                 <Button
@@ -290,7 +309,7 @@ export function ArticleView({ articleId, onClose, mode = 'split' }: ArticleViewP
                       : markAsRead.mutate(article.id)
                   }
                 >
-                  {article.isRead ? 'Mark as unread' : 'Mark as read'}
+                  {article.isRead ? t('markAsUnread') : t('markAsRead')}
                 </Button>
                 <Button
                   variant={article.isSaved ? 'default' : 'outline'}
@@ -300,12 +319,12 @@ export function ArticleView({ articleId, onClose, mode = 'split' }: ArticleViewP
                   {article.isSaved ? (
                     <>
                       <BookmarkCheck className="w-4 h-4" />
-                      Saved
+                      {t('saved')}
                     </>
                   ) : (
                     <>
                       <Bookmark className="w-4 h-4" />
-                      Save
+                      {t('save')}
                     </>
                   )}
                 </Button>
@@ -319,11 +338,12 @@ export function ArticleView({ articleId, onClose, mode = 'split' }: ArticleViewP
 
   if (mode === 'overlay') {
     return (
-      <AnimatePresence>
+      <>
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
           onClick={onClose}
         />
@@ -331,7 +351,7 @@ export function ArticleView({ articleId, onClose, mode = 'split' }: ArticleViewP
           initial={{ opacity: 0, x: '100%' }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: '100%' }}
-          transition={{ type: 'spring', damping: 20 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           className={cn(
             "fixed inset-y-0 right-0 z-50 glass",
             focusMode ? "w-full" : "w-full max-w-2xl"
@@ -339,7 +359,7 @@ export function ArticleView({ articleId, onClose, mode = 'split' }: ArticleViewP
         >
           {content}
         </motion.div>
-      </AnimatePresence>
+      </>
     );
   }
 

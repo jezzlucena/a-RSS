@@ -1,0 +1,96 @@
+{
+  "title": "Feeds",
+  "noFeeds": "Nenhum feed ainda",
+  "updated": "Atualizado {{time}}",
+  "addFeed": {
+    "title": "Adicionar Feed",
+    "urlLabel": "URL do Feed",
+    "urlPlaceholder": "https://exemplo.com/feed.xml",
+    "urlHelp": "Digite a URL de um feed RSS/Atom ou de um site para descobrir feeds.",
+    "categoryLabel": "Categoria (opcional)",
+    "feedAdded": "Feed Adicionado!",
+    "feedAddedMessage": "Seu feed foi adicionado com sucesso.",
+    "failedToDiscover": "Falha ao descobrir feed"
+  },
+  "editFeed": {
+    "title": "Editar Feed",
+    "customTitleLabel": "Título Personalizado",
+    "customTitleHelp": "Deixe vazio para usar o título original do feed",
+    "categoryLabel": "Categoria",
+    "saveChanges": "Salvar Alterações"
+  },
+  "contextMenu": {
+    "editFeed": "Editar Feed",
+    "moveToCategory": "Mover para Categoria",
+    "refreshFeed": "Atualizar Feed",
+    "visitWebsite": "Visitar Site",
+    "unsubscribe": "Cancelar Inscrição"
+  },
+  "confirmUnsubscribe": "Tem certeza que deseja cancelar a inscrição de \"{{title}}\"?",
+  "messages": {
+    "added": "Adicionado \"{{title}}\"",
+    "removed": "Feed removido",
+    "refreshed": "Feed atualizado",
+    "failedToAdd": "Falha ao adicionar feed",
+    "failedToRemove": "Falha ao remover feed",
+    "failedToRefresh": "Falha ao atualizar feed"
+  },
+  "categoryModal": {
+    "editTitle": "Editar Categoria",
+    "newTitle": "Nova Categoria",
+    "name": "Nome",
+    "namePlaceholder": "Nome da categoria",
+    "color": "Cor",
+    "custom": "Personalizado",
+    "parentCategory": "Categoria Pai",
+    "noneTopLevel": "Nenhuma (Nível Superior)",
+    "preview": "Prévia",
+    "cancel": "Cancelar",
+    "saveChanges": "Salvar Alterações",
+    "createCategory": "Criar Categoria"
+  },
+  "addModal": {
+    "title": "Adicionar Feed",
+    "feedUrl": "URL do Feed",
+    "check": "Verificar",
+    "discoverFailed": "Falha ao descobrir feed",
+    "hint": "Digite a URL de um feed RSS/Atom ou de um site para descobrir feeds.",
+    "categoryOptional": "Categoria (opcional)",
+    "success": "Feed Adicionado!",
+    "successMessage": "Seu feed foi adicionado com sucesso.",
+    "back": "Voltar",
+    "subscribe": "Inscrever-se"
+  },
+  "editModal": {
+    "title": "Editar Feed",
+    "customTitle": "Título Personalizado",
+    "customTitleHint": "Deixe vazio para usar o título original do feed",
+    "category": "Categoria",
+    "uncategorized": "Sem Categoria",
+    "cancel": "Cancelar",
+    "saveChanges": "Salvar Alterações"
+  },
+  "opml": {
+    "title": "Importar / Exportar OPML",
+    "import": "Importar",
+    "export": "Exportar",
+    "importDescription": "Importe suas assinaturas RSS de outro leitor usando um arquivo OPML.",
+    "exportDescription": "Exporte todas as suas assinaturas RSS para um arquivo OPML que pode ser importado em outros leitores.",
+    "clickToSelect": "Clique para selecionar arquivo OPML",
+    "orDragAndDrop": "ou arraste e solte",
+    "content": "Conteúdo OPML",
+    "importComplete": "Importação Concluída",
+    "feedsImported": "{{count}} feeds importados",
+    "feedsSkipped": "{{count}} feeds ignorados (já inscrito)",
+    "feedsFailed": "{{count}} feeds falharam ao importar",
+    "importFailed": "Falha ao importar OPML",
+    "exportFailed": "Falha ao exportar OPML",
+    "fileDescription": "Contém todos os seus feeds e categorias",
+    "done": "Concluído",
+    "cancel": "Cancelar",
+    "importing": "Importando...",
+    "exporting": "Exportando...",
+    "importFeeds": "Importar Feeds",
+    "downloadOpml": "Baixar OPML"
+  }
+}

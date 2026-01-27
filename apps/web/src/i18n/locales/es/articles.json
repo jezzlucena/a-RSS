@@ -1,0 +1,73 @@
+{
+  "selectArticle": "Selecciona un artículo para leer",
+  "selectToRead": "Selecciona un artículo para leer",
+  "notFound": "Artículo no encontrado",
+  "readingTime": "{{minutes}} min de lectura",
+  "by": "Por {{author}}",
+  "byAuthor": "Por {{author}}",
+  "readOriginal": "Leer artículo original en {{domain}}",
+  "readOriginalOn": "Leer artículo original en {{domain}}",
+  "back": "Volver",
+  "markAsRead": "Marcar como leído",
+  "markAsUnread": "Marcar como no leído",
+  "save": "Guardar",
+  "saved": "Guardado",
+  "saveForLater": "Guardar para después",
+  "removeFromSaved": "Quitar de guardados",
+  "openOriginal": "Abrir original",
+  "actions": {
+    "markAsRead": "Marcar como leído",
+    "markAsUnread": "Marcar como no leído",
+    "save": "Guardar",
+    "saved": "Guardado",
+    "saveForLater": "Guardar para después",
+    "removeFromSaved": "Quitar de guardados",
+    "openOriginal": "Abrir original"
+  },
+  "fontSize": {
+    "title": "Tamaño de fuente",
+    "small": "Pequeño",
+    "medium": "Mediano",
+    "large": "Grande"
+  },
+  "fontSizes": {
+    "small": "Pequeño",
+    "medium": "Mediano",
+    "large": "Grande"
+  },
+  "focusMode": {
+    "enter": "Entrar en modo enfoque",
+    "exit": "Salir del modo enfoque"
+  },
+  "messages": {
+    "saved": "Artículo guardado",
+    "unsaved": "Artículo quitado de guardados",
+    "removed": "Artículo quitado de guardados",
+    "failedToMarkRead": "Error al marcar artículo como leído",
+    "failedToMarkUnread": "Error al marcar artículo como no leído",
+    "failedToSave": "Error al actualizar estado de guardado"
+  },
+  "time": {
+    "justNow": "ahora mismo",
+    "minutesAgo": "hace {{count}}min",
+    "hoursAgo": "hace {{count}}h",
+    "daysAgo": "hace {{count}}d",
+    "weeksAgo": "hace {{count}}sem",
+    "monthsAgo": "hace {{count}}mes",
+    "yearsAgo": "hace {{count}}año",
+    "lessThanOneMinRead": "< 1 min de lectura",
+    "oneMinRead": "1 min de lectura",
+    "minRead": "{{count}} min de lectura"
+  },
+  "emptyState": {
+    "title": "Sin artículos",
+    "noSaved": "No hay artículos guardados aún.",
+    "allCaughtUp": "¡Todo al día!",
+    "noArticles": "No hay artículos para mostrar."
+  },
+  "sort": {
+    "label": "Ordenar",
+    "newestFirst": "Más recientes",
+    "oldestFirst": "Más antiguos"
+  }
+}

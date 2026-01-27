@@ -1,0 +1,16 @@
+{
+  "title": "Atalhos de Teclado",
+  "helpText": "Pressione ? para mostrar esta ajuda",
+  "descriptions": {
+    "nextArticle": "Próximo artigo",
+    "previousArticle": "Artigo anterior",
+    "openArticle": "Abrir artigo",
+    "closeArticle": "Fechar artigo",
+    "markAsRead": "Marcar como lido/não lido",
+    "toggleSaved": "Salvar/remover artigo",
+    "openOriginal": "Abrir link original",
+    "refresh": "Atualizar feeds",
+    "search": "Focar na busca",
+    "showShortcuts": "Mostrar atalhos de teclado"
+  }
+}

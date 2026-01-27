@@ -24,6 +24,21 @@ export interface FeedInfo {
   iconUrl: string | null;
 }
 
+/**
+ * Get favicon URL for a site using Google's favicon service
+ */
+function getFaviconUrl(siteUrl: string | null): string | null {
+  if (!siteUrl) return null;
+
+  try {
+    const url = new URL(siteUrl);
+    // Use Google's favicon service which reliably returns favicons
+    return `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=64`;
+  } catch {
+    return null;
+  }
+}
+
 export async function discoverFeed(url: string): Promise<FeedInfo> {
   const normalizedUrl = normalizeFeedUrl(url);
 
@@ -33,13 +48,17 @@ export async function discoverFeed(url: string): Promise<FeedInfo> {
 
   try {
     const feed = await parser.parseURL(normalizedUrl);
+    const siteUrl = feed.link || null;
+
+    // Prioritize favicon from the site's homepage, fall back to RSS feed image
+    const iconUrl = getFaviconUrl(siteUrl) || feed.image?.url || null;
 
     return {
       url: normalizedUrl,
       title: feed.title || 'Untitled Feed',
       description: feed.description || null,
-      siteUrl: feed.link || null,
-      iconUrl: feed.image?.url || null,
+      siteUrl,
+      iconUrl,
     };
   } catch (error) {
     throw new AppError(400, 'Unable to parse feed. Please check the URL and try again.');
@@ -175,6 +194,19 @@ export async function refreshFeed(feedId: string) {
   }
 
   await fetchFeedArticles(feedId, feed.url);
+
+  // Update icon if missing - use favicon from siteUrl
+  if (!feed.iconUrl && feed.siteUrl) {
+    const iconUrl = getFaviconUrl(feed.siteUrl);
+    if (iconUrl) {
+      await db
+        .update(feeds)
+        .set({ iconUrl })
+        .where(eq(feeds.id, feedId));
+
+      return { ...feed, iconUrl };
+    }
+  }
 
   return feed;
 }

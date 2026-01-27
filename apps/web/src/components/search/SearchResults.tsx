@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { Search, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui';
@@ -16,6 +17,7 @@ interface SearchResultsProps {
 }
 
 export function SearchResults({ onSelectArticle }: SearchResultsProps) {
+  const { t } = useTranslation('search');
   const { searchQuery, setSearchQuery } = useFeedStore();
   const { selectedArticleId } = useArticleStore();
   const { layout } = useUIStore();
@@ -44,7 +46,7 @@ export function SearchResults({ onSelectArticle }: SearchResultsProps) {
       <div className="h-full flex items-center justify-center text-muted-foreground">
         <div className="text-center">
           <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p>Enter a search term to find articles</p>
+          <p>{t('enterSearchTerm')}</p>
         </div>
       </div>
     );
@@ -61,7 +63,7 @@ export function SearchResults({ onSelectArticle }: SearchResultsProps) {
         <div className="flex items-center gap-2">
           <Search className="w-5 h-5 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">
-            {pagination ? `${pagination.total} results for` : 'Results for'}
+            {pagination ? t('resultsFor', { count: pagination.total }) : t('resultsForNoCount')}
           </span>
           <span className="font-medium">"{searchQuery}"</span>
           {isFetching && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
@@ -79,7 +81,7 @@ export function SearchResults({ onSelectArticle }: SearchResultsProps) {
             className="text-muted-foreground hover:text-foreground"
           >
             <X className="w-4 h-4" />
-            Clear
+            {t('clear')}
           </Button>
         </div>
       </div>
@@ -89,8 +91,8 @@ export function SearchResults({ onSelectArticle }: SearchResultsProps) {
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
           <div className="text-center">
             <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>No articles found for "{searchQuery}"</p>
-            <p className="text-sm mt-2">Try different keywords or check your spelling</p>
+            <p>{t('noResults', { query: searchQuery })}</p>
+            <p className="text-sm mt-2">{t('noResultsHint')}</p>
           </div>
         </div>
       ) : (
@@ -158,10 +160,10 @@ export function SearchResults({ onSelectArticle }: SearchResultsProps) {
                 disabled={page <= 1}
                 onClick={() => setPage(page - 1)}
               >
-                Previous
+                {t('previous')}
               </Button>
               <span className="text-sm text-muted-foreground">
-                Page {page} of {pagination.totalPages}
+                {t('pageOf', { page, totalPages: pagination.totalPages })}
               </span>
               <Button
                 variant="outline"
@@ -169,7 +171,7 @@ export function SearchResults({ onSelectArticle }: SearchResultsProps) {
                 disabled={page >= pagination.totalPages}
                 onClick={() => setPage(page + 1)}
               >
-                Next
+                {t('next')}
               </Button>
             </div>
           )}

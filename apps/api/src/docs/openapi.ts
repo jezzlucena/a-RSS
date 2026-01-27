@@ -757,8 +757,8 @@ export const openApiSpec: OpenAPIV3.Document = {
         properties: {
           theme: { type: 'string', enum: ['light', 'dark', 'system'] },
           accentColor: { type: 'string' },
-          layout: { type: 'string', enum: ['list', 'cards', 'magazine'] },
-          articleView: { type: 'string', enum: ['split', 'overlay', 'full'] },
+          layout: { type: 'string', enum: ['compact', 'list', 'cards', 'magazine'] },
+          articleView: { type: 'string', enum: ['split-horizontal', 'split-vertical', 'overlay', 'full'] },
           fontSize: { type: 'string', enum: ['small', 'medium', 'large'] },
         },
       },

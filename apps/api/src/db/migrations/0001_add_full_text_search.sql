@@ -3,8 +3,8 @@
 -- Drop the old searchVector text column if it exists
 ALTER TABLE articles DROP COLUMN IF EXISTS search_vector;
 
--- Add tsvector column for full-text search
-ALTER TABLE articles ADD COLUMN search_tsvector tsvector;
+-- Add tsvector column for full-text search (IF NOT EXISTS requires PostgreSQL 9.6+)
+ALTER TABLE articles ADD COLUMN IF NOT EXISTS search_tsvector tsvector;
 
 -- Populate the search vector for existing articles
 -- Weights: A (highest) = title, B = summary, C (lowest) = content

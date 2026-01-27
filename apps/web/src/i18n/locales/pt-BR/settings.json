@@ -1,0 +1,91 @@
+{
+  "title": "Configurações",
+  "subtitle": "Personalize sua experiência de leitura",
+  "backToArticles": "Voltar aos Artigos",
+  "appearance": {
+    "title": "Aparência",
+    "description": "Escolha como o aRSS aparece para você",
+    "light": "Claro",
+    "dark": "Escuro",
+    "system": "Sistema"
+  },
+  "accentColor": {
+    "title": "Cor de Destaque",
+    "description": "Escolha uma cor que reflita seu estilo",
+    "custom": "Personalizado"
+  },
+  "feedLayout": {
+    "title": "Layout do Feed",
+    "description": "Escolha como os artigos são exibidos no feed",
+    "compact": "Compacto",
+    "list": "Lista",
+    "cards": "Cartões",
+    "magazine": "Revista"
+  },
+  "articleView": {
+    "title": "Visualização de Artigo",
+    "description": "Como os artigos abrem quando você clica neles",
+    "splitHorizontal": "Divisão Horizontal",
+    "splitVertical": "Divisão Vertical",
+    "horizontalSplit": "Divisão Horizontal",
+    "verticalSplit": "Divisão Vertical",
+    "overlay": "Sobreposição",
+    "full": "Tela Cheia"
+  },
+  "reading": {
+    "title": "Leitura",
+    "description": "Personalize sua experiência de leitura",
+    "fontSizeLabel": "Tamanho da Fonte",
+    "fontSize": "Tamanho da Fonte",
+    "small": "Pequeno",
+    "medium": "Médio",
+    "large": "Grande"
+  },
+  "language": {
+    "title": "Idioma",
+    "description": "Escolha seu idioma preferido"
+  },
+  "security": {
+    "title": "Segurança",
+    "description": "Atualize sua senha",
+    "currentPassword": "Senha Atual",
+    "currentPasswordPlaceholder": "Digite a senha atual",
+    "newPassword": "Nova Senha",
+    "newPasswordPlaceholder": "Digite a nova senha (mín. 8 caracteres)",
+    "confirmPassword": "Confirmar Nova Senha",
+    "confirmNewPassword": "Confirmar Nova Senha",
+    "confirmPasswordPlaceholder": "Confirme a nova senha",
+    "changePassword": "Alterar Senha",
+    "changePasswordButton": "Alterar Senha",
+    "changingPassword": "Alterando Senha...",
+    "passwordChanged": "Senha alterada com sucesso",
+    "passwordChangeFailed": "Falha ao alterar senha",
+    "fillAllFields": "Por favor, preencha todos os campos de senha",
+    "passwordMinLength": "A nova senha deve ter pelo menos 8 caracteres",
+    "passwordsNoMatch": "As novas senhas não coincidem"
+  },
+  "passwordMessages": {
+    "success": "Senha alterada com sucesso",
+    "failed": "Falha ao alterar senha",
+    "fillAllFields": "Por favor, preencha todos os campos de senha",
+    "minLength": "A nova senha deve ter pelo menos 8 caracteres",
+    "noMatch": "As novas senhas não coincidem"
+  },
+  "data": {
+    "title": "Dados",
+    "opml": "Importar / Exportar OPML"
+  },
+  "techStack": {
+    "title": "Stack de Tecnologias",
+    "description": "Construído com tecnologias modernas e de código aberto"
+  },
+  "about": {
+    "title": "Sobre",
+    "subtitle": "aRSS - another RSS Software Solution",
+    "description": "aRSS é um leitor de RSS moderno e de código aberto focado em proporcionar uma experiência de leitura bonita e intuitiva. Mantenha-se atualizado com todo o seu conteúdo favorito em um só lugar.",
+    "text": "aRSS é um leitor de RSS moderno e de código aberto focado em proporcionar uma experiência de leitura bonita e intuitiva. Mantenha-se atualizado com todo o seu conteúdo favorito em um só lugar.",
+    "viewOnGitHub": "Ver no GitHub",
+    "viewOnGithub": "Ver no GitHub",
+    "sponsor": "Patrocinar"
+  }
+}

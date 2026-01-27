@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { X, Rss, Loader2 } from 'lucide-react';
 import {
   Button,
@@ -22,8 +23,16 @@ interface EditFeedModalProps {
 }
 
 export function EditFeedModal({ isOpen, onClose, subscription }: EditFeedModalProps) {
+  const { t } = useTranslation('feeds');
   const [customTitle, setCustomTitle] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+
+  // Keep reference to last valid subscription for exit animation
+  const lastSubscriptionRef = useRef<SubscriptionWithFeed | null>(null);
+  if (subscription) {
+    lastSubscriptionRef.current = subscription;
+  }
+  const displaySubscription = subscription || lastSubscriptionRef.current;
 
   const { data: categories = [] } = useCategories();
   const updateSubscription = useUpdateSubscription();
@@ -54,11 +63,9 @@ export function EditFeedModal({ isOpen, onClose, subscription }: EditFeedModalPr
     onClose();
   };
 
-  if (!subscription) return null;
-
   return (
     <AnimatePresence>
-      {isOpen && (
+      {isOpen && displaySubscription && (
         <>
           {/* Backdrop */}
           <motion.div
@@ -75,10 +82,11 @@ export function EditFeedModal({ isOpen, onClose, subscription }: EditFeedModalPr
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={handleClose}
           >
-            <Card className="w-full max-w-md">
+            <Card className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-xl">Edit Feed</CardTitle>
+                <CardTitle className="text-xl">{t('editModal.title')}</CardTitle>
                 <Button variant="ghost" size="icon-sm" onClick={handleClose}>
                   <X className="w-4 h-4" />
                 </Button>
@@ -88,9 +96,9 @@ export function EditFeedModal({ isOpen, onClose, subscription }: EditFeedModalPr
                 {/* Feed Info */}
                 <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-accent-500/10 flex items-center justify-center">
-                    {subscription.feed.iconUrl ? (
+                    {displaySubscription.feed.iconUrl ? (
                       <img
-                        src={subscription.feed.iconUrl}
+                        src={displaySubscription.feed.iconUrl}
                         alt=""
                         className="w-6 h-6 rounded"
                       />
@@ -99,29 +107,29 @@ export function EditFeedModal({ isOpen, onClose, subscription }: EditFeedModalPr
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{subscription.feed.title}</p>
+                    <p className="font-medium truncate">{displaySubscription.feed.title}</p>
                     <p className="text-sm text-gray-500 truncate">
-                      {subscription.feed.url}
+                      {displaySubscription.feed.url}
                     </p>
                   </div>
                 </div>
 
                 {/* Custom Title */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Custom Title</label>
+                  <label className="text-sm font-medium">{t('editModal.customTitle')}</label>
                   <Input
                     value={customTitle}
                     onChange={(e) => setCustomTitle(e.target.value)}
-                    placeholder={subscription.feed.title}
+                    placeholder={displaySubscription.feed.title}
                   />
                   <p className="text-xs text-gray-500">
-                    Leave empty to use the original feed title
+                    {t('editModal.customTitleHint')}
                   </p>
                 </div>
 
                 {/* Category Selection */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Category</label>
+                  <label className="text-sm font-medium">{t('editModal.category')}</label>
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => setSelectedCategoryId(null)}
@@ -132,7 +140,7 @@ export function EditFeedModal({ isOpen, onClose, subscription }: EditFeedModalPr
                           : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
                       )}
                     >
-                      Uncategorized
+                      {t('editModal.uncategorized')}
                     </button>
                     {categories.map((cat) => (
                       <button
@@ -158,13 +166,13 @@ export function EditFeedModal({ isOpen, onClose, subscription }: EditFeedModalPr
 
               <CardFooter className="flex gap-2 justify-end">
                 <Button variant="ghost" onClick={handleClose}>
-                  Cancel
+                  {t('editModal.cancel')}
                 </Button>
                 <Button onClick={handleSave} disabled={updateSubscription.isPending}>
                   {updateSubscription.isPending ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    'Save Changes'
+                    t('editModal.saveChanges')
                   )}
                 </Button>
               </CardFooter>

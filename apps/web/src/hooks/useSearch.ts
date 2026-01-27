@@ -58,10 +58,15 @@ async function fetchSuggestions(query: string): Promise<SearchSuggestion[]> {
   return response.data.data;
 }
 
-export function useSearchSuggestions() {
-  const [query, setQuery] = useState('');
+export function useSearchSuggestions(initialValue: string = '') {
+  const [query, setQuery] = useState(initialValue);
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync with external initial value changes
+  useEffect(() => {
+    setQuery(initialValue);
+  }, [initialValue]);
 
   const updateQuery = useCallback((value: string) => {
     setQuery(value);

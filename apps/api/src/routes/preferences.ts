@@ -10,8 +10,8 @@ const router = Router();
 const updatePreferencesSchema = z.object({
   theme: z.enum(['light', 'dark', 'system']).optional(),
   accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Invalid color format').optional(),
-  layout: z.enum(['list', 'cards', 'magazine']).optional(),
-  articleView: z.enum(['split', 'overlay', 'full']).optional(),
+  layout: z.enum(['compact', 'list', 'cards', 'magazine']).optional(),
+  articleView: z.enum(['split-horizontal', 'split-vertical', 'overlay', 'full']).optional(),
   fontSize: z.enum(['small', 'medium', 'large']).optional(),
 });
 

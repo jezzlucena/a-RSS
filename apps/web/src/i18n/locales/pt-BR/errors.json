@@ -1,0 +1,16 @@
+{
+  "generic": {
+    "title": "Algo deu errado",
+    "message": "Encontramos um erro inesperado. Por favor, tente novamente.",
+    "details": "Detalhes do Erro"
+  },
+  "article": {
+    "failedToLoad": "Falha ao carregar conteúdo do artigo"
+  },
+  "feed": {
+    "failedToLoad": "Falha ao carregar feeds"
+  },
+  "compact": {
+    "failedToLoad": "Falha ao carregar"
+  }
+}

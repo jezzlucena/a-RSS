@@ -185,6 +185,45 @@ export async function getMe(userId: string) {
   return user;
 }
 
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export async function changePassword(userId: string, input: ChangePasswordInput) {
+  const { currentPassword, newPassword } = input;
+
+  // Find user with password
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  });
+
+  if (!user) {
+    throw new AppError(404, 'User not found');
+  }
+
+  // Verify current password
+  const isValid = await bcrypt.compare(currentPassword, user.password);
+
+  if (!isValid) {
+    throw new AppError(401, 'Current password is incorrect');
+  }
+
+  // Hash new password
+  const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+  // Update password
+  await db
+    .update(users)
+    .set({ password: hashedPassword, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+
+  // Invalidate all refresh tokens for security
+  await db.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
+
+  return { success: true };
+}
+
 async function storeRefreshToken(userId: string, token: string) {
   // Calculate expiration (7 days from now)
   const expiresAt = new Date();

@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { X, Keyboard } from 'lucide-react';
 import { Button, Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
 import { useKeyboardShortcuts } from '@/hooks';
@@ -9,6 +10,7 @@ interface KeyboardShortcutsHelpProps {
 }
 
 export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelpProps) {
+  const { t } = useTranslation('shortcuts');
   const shortcuts = useKeyboardShortcuts();
 
   return (
@@ -35,7 +37,7 @@ export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelp
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-xl flex items-center gap-2">
                   <Keyboard className="w-5 h-5" />
-                  Keyboard Shortcuts
+                  {t('title')}
                 </CardTitle>
                 <Button variant="ghost" size="icon-sm" onClick={onClose}>
                   <X className="w-4 h-4" />
@@ -60,7 +62,7 @@ export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelp
                 </div>
 
                 <p className="mt-4 text-xs text-gray-400 text-center">
-                  Press <kbd className="px-1 py-0.5 text-xs font-mono bg-gray-100 dark:bg-gray-800 rounded">?</kbd> to show this help
+                  {t('pressHint')} <kbd className="px-1 py-0.5 text-xs font-mono bg-gray-100 dark:bg-gray-800 rounded">?</kbd> {t('toShowHelp')}
                 </p>
               </CardContent>
             </Card>
