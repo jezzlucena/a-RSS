@@ -360,60 +360,6 @@ export function SettingsPage() {
         </div>
       </SettingsSection>
 
-      {/* Profile Section */}
-      <SettingsSection
-        title={t('profile.title')}
-        description={t('profile.description')}
-      >
-        <div className="space-y-4 max-w-md">
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium mb-2">
-              <User className="w-4 h-4" />
-              {t('profile.name')}
-            </label>
-            <Input
-              type="text"
-              value={profileName}
-              onChange={(e) => setProfileName(e.target.value)}
-              placeholder={t('profile.namePlaceholder')}
-            />
-          </div>
-
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium mb-2">
-              <Mail className="w-4 h-4" />
-              {t('profile.email')}
-            </label>
-            <Input
-              type="email"
-              value={profileEmail}
-              onChange={(e) => setProfileEmail(e.target.value)}
-              placeholder={t('profile.emailPlaceholder')}
-            />
-          </div>
-
-          <Button
-            onClick={handleUpdateProfile}
-            disabled={
-              updateProfileMutation.isPending ||
-              (profileName === user?.name && profileEmail === user?.email) ||
-              !profileName ||
-              !profileEmail
-            }
-            className="w-full sm:w-auto"
-          >
-            {updateProfileMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                {t('profile.saving')}
-              </>
-            ) : (
-              t('profile.saveChanges')
-            )}
-          </Button>
-        </div>
-      </SettingsSection>
-
       {/* Layout Section */}
       <SettingsSection
         title={t('feedLayout.title')}
@@ -589,6 +535,60 @@ export function SettingsPage() {
               </button>
             </div>
           </div>
+        </div>
+      </SettingsSection>
+
+      {/* Profile Section */}
+      <SettingsSection
+        title={t('profile.title')}
+        description={t('profile.description')}
+      >
+        <div className="space-y-4 max-w-md">
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium mb-2">
+              <User className="w-4 h-4" />
+              {t('profile.name')}
+            </label>
+            <Input
+              type="text"
+              value={profileName}
+              onChange={(e) => setProfileName(e.target.value)}
+              placeholder={t('profile.namePlaceholder')}
+            />
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium mb-2">
+              <Mail className="w-4 h-4" />
+              {t('profile.email')}
+            </label>
+            <Input
+              type="email"
+              value={profileEmail}
+              onChange={(e) => setProfileEmail(e.target.value)}
+              placeholder={t('profile.emailPlaceholder')}
+            />
+          </div>
+
+          <Button
+            onClick={handleUpdateProfile}
+            disabled={
+              updateProfileMutation.isPending ||
+              (profileName === user?.name && profileEmail === user?.email) ||
+              !profileName ||
+              !profileEmail
+            }
+            className="w-full sm:w-auto"
+          >
+            {updateProfileMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                {t('profile.saving')}
+              </>
+            ) : (
+              t('profile.saveChanges')
+            )}
+          </Button>
         </div>
       </SettingsSection>
 
