@@ -1,6 +1,6 @@
-# Contributing to aRSS
+# Contributing to a-RSS
 
-Thank you for your interest in contributing to aRSS! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to a-RSS! This document provides guidelines and instructions for contributing.
 
 ## Code of Conduct
 
@@ -24,8 +24,8 @@ By participating in this project, you agree to maintain a respectful and inclusi
 2. **Clone your fork**
 
    ```bash
-   git clone https://github.com/YOUR_USERNAME/aRSS.git
-   cd aRSS
+   git clone https://github.com/YOUR_USERNAME/a-RSS.git
+   cd a-RSS
    ```
 
 3. **Install dependencies**
@@ -59,7 +59,7 @@ By participating in this project, you agree to maintain a respectful and inclusi
 ## Project Structure
 
 ```
-aRSS/
+a-RSS/
 ├── apps/
 │   ├── api/                 # Express backend API
 │   │   ├── src/
@@ -90,7 +90,7 @@ aRSS/
 
 Before creating a bug report:
 
-1. Check the [existing issues](https://github.com/jezzlucena/aRSS/issues) to avoid duplicates
+1. Check the [existing issues](https://github.com/jezzlucena/a-RSS/issues) to avoid duplicates
 2. Update to the latest version to see if the bug persists
 
 When creating a bug report, include:
@@ -229,14 +229,14 @@ Feature requests are welcome! Please:
 
 ## Questions?
 
-- Open a [Discussion](https://github.com/jezzlucena/aRSS/discussions) for questions
+- Open a [Discussion](https://github.com/jezzlucena/a-RSS/discussions) for questions
 - Join the community chat (if available)
 - Check the [documentation](./docs/)
 
 ## Recognition
 
-Contributors will be recognized in the project README. Thank you for helping make aRSS better!
+Contributors will be recognized in the project README. Thank you for helping make a-RSS better!
 
 ## License
 
-By contributing to aRSS, you agree that your contributions will be licensed under the MIT License.
+By contributing to a-RSS, you agree that your contributions will be licensed under the MIT License.

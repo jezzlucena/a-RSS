@@ -302,7 +302,7 @@ export const opmlService = {
       opml: {
         '@_version': '2.0',
         head: {
-          title: 'aRSS Subscriptions',
+          title: 'a-RSS Subscriptions',
           dateCreated: new Date().toISOString(),
         },
         body: {

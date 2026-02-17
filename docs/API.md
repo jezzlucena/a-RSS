@@ -1,6 +1,6 @@
-# aRSS API Documentation
+# a-RSS API Documentation
 
-Complete API reference for the aRSS backend. The API follows RESTful conventions and uses JSON for request/response bodies.
+Complete API reference for the a-RSS backend. The API follows RESTful conventions and uses JSON for request/response bodies.
 
 ## Base URL
 

@@ -288,7 +288,7 @@ export function Sidebar() {
                 <div className="w-8 h-8 rounded-lg bg-accent-500 flex items-center justify-center">
                   <Rss className="w-5 h-5 text-white" />
                 </div>
-                <span className="font-bold text-lg">aRSS</span>
+                <span className="font-bold text-lg">a-RSS</span>
               </motion.div>
             )}
           </AnimatePresence>

@@ -4,7 +4,7 @@
   "backToArticles": "Volver a Artículos",
   "appearance": {
     "title": "Apariencia",
-    "description": "Elige cómo se ve aRSS para ti",
+    "description": "Elige cómo se ve a-RSS para ti",
     "light": "Claro",
     "dark": "Oscuro",
     "system": "Sistema"
@@ -105,9 +105,9 @@
   },
   "about": {
     "title": "Acerca de",
-    "subtitle": "aRSS - another RSS Software Solution",
-    "description": "aRSS es un lector de RSS moderno y de código abierto enfocado en proporcionar una experiencia de lectura hermosa e intuitiva. Mantente actualizado con todo tu contenido favorito en un solo lugar.",
-    "text": "aRSS es un lector de RSS moderno y de código abierto enfocado en proporcionar una experiencia de lectura hermosa e intuitiva. Mantente actualizado con todo tu contenido favorito en un solo lugar.",
+    "subtitle": "a-RSS - another RSS Software Solution",
+    "description": "a-RSS es un lector de RSS moderno y de código abierto enfocado en proporcionar una experiencia de lectura hermosa e intuitiva. Mantente actualizado con todo tu contenido favorito en un solo lugar.",
+    "text": "a-RSS es un lector de RSS moderno y de código abierto enfocado en proporcionar una experiencia de lectura hermosa e intuitiva. Mantente actualizado con todo tu contenido favorito en un solo lugar.",
     "viewOnGitHub": "Ver en GitHub",
     "viewOnGithub": "Ver en GitHub",
     "sponsor": "Patrocinar"

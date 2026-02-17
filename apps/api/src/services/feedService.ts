@@ -7,7 +7,7 @@ import { normalizeFeedUrl, isValidUrl } from '@arss/utils';
 const parser = new Parser({
   timeout: 10000,
   headers: {
-    'User-Agent': 'aRSS/1.0 RSS Reader',
+    'User-Agent': 'a-RSS/1.0 RSS Reader',
   },
 });
 

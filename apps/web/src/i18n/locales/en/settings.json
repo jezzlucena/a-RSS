@@ -4,7 +4,7 @@
   "backToArticles": "Back to Articles",
   "appearance": {
     "title": "Appearance",
-    "description": "Choose how aRSS looks to you",
+    "description": "Choose how a-RSS looks to you",
     "light": "Light",
     "dark": "Dark",
     "system": "System"
@@ -105,9 +105,9 @@
   },
   "about": {
     "title": "About",
-    "subtitle": "aRSS - another RSS Software Solution",
-    "description": "aRSS is a modern, open-source RSS reader focused on providing a beautiful and intuitive reading experience. Stay updated with all your favorite content in one place.",
-    "text": "aRSS is a modern, open-source RSS reader focused on providing a beautiful and intuitive reading experience. Stay updated with all your favorite content in one place.",
+    "subtitle": "a-RSS - another RSS Software Solution",
+    "description": "a-RSS is a modern, open-source RSS reader focused on providing a beautiful and intuitive reading experience. Stay updated with all your favorite content in one place.",
+    "text": "a-RSS is a modern, open-source RSS reader focused on providing a beautiful and intuitive reading experience. Stay updated with all your favorite content in one place.",
     "viewOnGitHub": "View on GitHub",
     "viewOnGithub": "View on GitHub",
     "sponsor": "Sponsor"

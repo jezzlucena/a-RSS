@@ -3,11 +3,11 @@ import { OpenAPIV3 } from 'openapi-types';
 export const openApiSpec: OpenAPIV3.Document = {
   openapi: '3.0.3',
   info: {
-    title: 'aRSS API',
-    description: 'API for aRSS - Another RSS Software Solution. A modern RSS reader focused on UI/UX excellence.',
+    title: 'a-RSS API',
+    description: 'API for a-RSS - Another RSS Software Solution. A modern RSS reader focused on UI/UX excellence.',
     version: '1.0.0',
     contact: {
-      name: 'aRSS Support',
+      name: 'a-RSS Support',
     },
     license: {
       name: 'MIT',

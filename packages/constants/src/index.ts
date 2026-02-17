@@ -1,5 +1,5 @@
 /**
- * Shared constants used across the aRSS application.
+ * Shared constants used across the a-RSS application.
  */
 
 // Password requirements

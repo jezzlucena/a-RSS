@@ -1,4 +1,4 @@
-# aRSS - another RSS Software Solution
+# a-RSS - another RSS Software Solution
 
 A modern, self-hosted RSS feed reader with a clean interface and powerful features. Built with a full-stack TypeScript monorepo architecture.
 
@@ -29,7 +29,7 @@ A modern, self-hosted RSS feed reader with a clean interface and powerful featur
 ## Project Structure
 
 ```
-aRSS/
+a-RSS/
 ├── apps/
 │   ├── api/                 # Express backend API
 │   │   ├── src/
@@ -73,8 +73,8 @@ aRSS/
 
 1. **Clone and install dependencies**
    ```bash
-   git clone https://github.com/jezzlucena/aRSS.git
-   cd aRSS
+   git clone https://github.com/jezzlucena/a-RSS.git
+   cd a-RSS
    pnpm install
    ```
 

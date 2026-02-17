@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Shared validation schemas used across the aRSS application.
+ * Shared validation schemas used across the a-RSS application.
  * These can be used for both server-side and client-side validation.
  */
 

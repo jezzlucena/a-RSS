@@ -62,7 +62,7 @@ app.get('/health', (_req, res) => {
 // API Documentation
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, {
   customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'aRSS API Documentation',
+  customSiteTitle: 'a-RSS API Documentation',
 }));
 
 // OpenAPI spec endpoint

@@ -30,7 +30,7 @@
     "searchQuery": "Search: \"{{query}}\""
   },
   "welcome": {
-    "title": "Welcome to aRSS",
+    "title": "Welcome to a-RSS",
     "description": "Get started by adding your first RSS feed. Stay updated with all your favorite content in one beautiful place.",
     "addFirstFeed": "Add Your First Feed"
   }

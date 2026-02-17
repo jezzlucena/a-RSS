@@ -2,7 +2,7 @@
   "name": "arss",
   "version": "0.1.0",
   "private": true,
-  "description": "aRSS - Another RSS Software Solution",
+  "description": "a-RSS - Another RSS Software Solution",
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
