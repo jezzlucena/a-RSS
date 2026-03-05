@@ -76,8 +76,8 @@
   "markAllAsRead": {
     "title": "Marcar como lido",
     "all": "Tudo",
-    "past1Day": "Exceto últimas 24h",
-    "past7Days": "Exceto últimos 7d",
+    "past1Day": "Mais de 24h",
+    "past7Days": "Mais de 7d",
     "success": "{{count}} artigos marcados como lidos"
   }
 }

@@ -39,6 +39,148 @@ function getFaviconUrl(siteUrl: string | null): string | null {
   }
 }
 
+/**
+ * Common feed URL paths to try when direct parsing and metatag discovery fail
+ */
+const COMMON_FEED_PATHS = [
+  '/feed',
+  '/rss',
+  '/atom',
+  '/feed.xml',
+  '/rss.xml',
+  '/atom.xml',
+  '/index.xml',
+  '/feed/rss',
+  '/feed/atom',
+  '/rss/feed',
+  '/.rss',
+  '/blog/feed',
+  '/blog/rss',
+  '/feeds/posts/default', // Blogger
+];
+
+/**
+ * Try to parse a URL as an RSS/Atom feed, returning null on failure
+ */
+async function tryParseFeed(url: string): Promise<{ feed: Parser.Output<Record<string, unknown>>; url: string } | null> {
+  try {
+    const feed = await parser.parseURL(url);
+    if (feed && (feed.title || (feed.items && feed.items.length > 0))) {
+      return { feed, url };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build a FeedInfo object from a parsed feed
+ */
+function buildFeedInfo(feed: Parser.Output<Record<string, unknown>>, feedUrl: string): FeedInfo {
+  const siteUrl = feed.link || null;
+  const iconUrl = getFaviconUrl(siteUrl) || feed.image?.url || null;
+
+  return {
+    url: feedUrl,
+    title: feed.title || 'Untitled Feed',
+    description: feed.description || null,
+    siteUrl,
+    iconUrl,
+  };
+}
+
+/**
+ * Fetch a URL and extract feed links from HTML metatags
+ * Looks for <link rel="alternate" type="application/rss+xml"> and similar tags
+ */
+async function discoverFeedUrlsFromHtml(pageUrl: string): Promise<string[]> {
+  try {
+    const response = await fetch(pageUrl, {
+      headers: { 'User-Agent': 'a-RSS/1.0 RSS Reader' },
+      signal: AbortSignal.timeout(10000),
+      redirect: 'follow',
+    });
+
+    if (!response.ok) return [];
+
+    const contentType = response.headers.get('content-type') || '';
+    // If the response is already a feed, don't try to parse as HTML
+    if (contentType.includes('xml') || contentType.includes('rss') || contentType.includes('atom')) {
+      return [];
+    }
+
+    const html = await response.text();
+
+    // Match <link> tags with rel="alternate" and RSS/Atom types
+    const feedLinkRegex = /<link[^>]*\brel=["']alternate["'][^>]*>/gi;
+    const matches = html.match(feedLinkRegex) || [];
+
+    const feedUrls: string[] = [];
+
+    for (const tag of matches) {
+      const typeMatch = tag.match(/\btype=["']([^"']+)["']/i);
+      const hrefMatch = tag.match(/\bhref=["']([^"']+)["']/i);
+
+      if (!typeMatch || !hrefMatch) continue;
+
+      const type = typeMatch[1].toLowerCase();
+      if (
+        type.includes('rss') ||
+        type.includes('atom') ||
+        type.includes('xml')
+      ) {
+        const href = hrefMatch[1];
+        // Resolve relative URLs against the page URL
+        try {
+          const absoluteUrl = new URL(href, pageUrl).toString();
+          feedUrls.push(absoluteUrl);
+        } catch {
+          // Skip invalid URLs
+        }
+      }
+    }
+
+    // Also check for links where type comes before rel
+    const feedLinkRegex2 = /<link[^>]*\btype=["']application\/(rss|atom)\+xml["'][^>]*>/gi;
+    const matches2 = html.match(feedLinkRegex2) || [];
+
+    for (const tag of matches2) {
+      const hrefMatch = tag.match(/\bhref=["']([^"']+)["']/i);
+      if (!hrefMatch) continue;
+
+      const href = hrefMatch[1];
+      try {
+        const absoluteUrl = new URL(href, pageUrl).toString();
+        if (!feedUrls.includes(absoluteUrl)) {
+          feedUrls.push(absoluteUrl);
+        }
+      } catch {
+        // Skip invalid URLs
+      }
+    }
+
+    return feedUrls;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Generate common feed URL variations from a base URL
+ */
+function getCommonFeedUrls(baseUrl: string): string[] {
+  try {
+    const url = new URL(baseUrl);
+    // Use the origin (scheme + host) as the base for common paths
+    const origin = url.origin;
+
+    return COMMON_FEED_PATHS.map(path => `${origin}${path}`);
+  } catch {
+    return [];
+  }
+}
+
 export async function discoverFeed(url: string): Promise<FeedInfo> {
   const normalizedUrl = normalizeFeedUrl(url);
 
@@ -46,23 +188,37 @@ export async function discoverFeed(url: string): Promise<FeedInfo> {
     throw new AppError(400, 'Invalid URL');
   }
 
-  try {
-    const feed = await parser.parseURL(normalizedUrl);
-    const siteUrl = feed.link || null;
-
-    // Prioritize favicon from the site's homepage, fall back to RSS feed image
-    const iconUrl = getFaviconUrl(siteUrl) || feed.image?.url || null;
-
-    return {
-      url: normalizedUrl,
-      title: feed.title || 'Untitled Feed',
-      description: feed.description || null,
-      siteUrl,
-      iconUrl,
-    };
-  } catch (error) {
-    throw new AppError(400, 'Unable to parse feed. Please check the URL and try again.');
+  // Step 1: Try parsing the URL directly as a feed
+  const directResult = await tryParseFeed(normalizedUrl);
+  if (directResult) {
+    return buildFeedInfo(directResult.feed, directResult.url);
   }
+
+  // Step 2: Fetch the page and look for feed metatags in the HTML
+  const discoveredUrls = await discoverFeedUrlsFromHtml(normalizedUrl);
+
+  for (const feedUrl of discoveredUrls) {
+    const result = await tryParseFeed(feedUrl);
+    if (result) {
+      return buildFeedInfo(result.feed, result.url);
+    }
+  }
+
+  // Step 3: Try common feed URL path variations
+  const commonUrls = getCommonFeedUrls(normalizedUrl);
+
+  // Try them in parallel in small batches for speed
+  const batchSize = 5;
+  for (let i = 0; i < commonUrls.length; i += batchSize) {
+    const batch = commonUrls.slice(i, i + batchSize);
+    const results = await Promise.all(batch.map(u => tryParseFeed(u)));
+    const found = results.find(r => r !== null);
+    if (found) {
+      return buildFeedInfo(found.feed, found.url);
+    }
+  }
+
+  throw new AppError(400, 'Unable to find a feed. Please check the URL and try again.');
 }
 
 export async function addFeed(userId: string, input: AddFeedInput) {
