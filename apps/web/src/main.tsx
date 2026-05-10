@@ -1,28 +1,16 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import App from './App';
-import './styles/globals.css';
-import './i18n';
+import './styles/index.css';
 
-// Initialize theme from localStorage before render to prevent flash
-const storedState = localStorage.getItem('arss-ui');
-if (storedState) {
-  try {
-    const { state } = JSON.parse(storedState);
-    const theme = state?.theme || 'system';
-    const isDark =
-      theme === 'dark' ||
-      (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    }
-  } catch {
-    // Ignore parsing errors
-  }
-}
+const rootEl = document.getElementById('root');
+if (!rootEl) throw new Error('#root not found');
 
-createRoot(document.getElementById('root')!).render(
+createRoot(rootEl).render(
   <StrictMode>
-    <App />
-  </StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </StrictMode>,
 );

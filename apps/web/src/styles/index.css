@@ -1,0 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..800;1,9..144,400..700&family=Geist:wght@400..700&family=JetBrains+Mono:wght@500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    background-color: theme('colors.paper');
+    color: theme('colors.ink');
+    font-family: theme('fontFamily.sans');
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background-color: theme('colors.paper');
+  }
+  ::selection {
+    background-color: theme('colors.vermilion');
+    color: theme('colors.paper');
+  }
+  input,
+  button,
+  textarea,
+  select {
+    font: inherit;
+  }
+  *:focus-visible {
+    outline: 2px solid theme('colors.vermilion');
+    outline-offset: 2px;
+    border-radius: 1px;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: theme('fontFamily.display');
+    font-feature-settings: 'ss01' 1, 'ss02' 1;
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+  .hairline {
+    box-shadow: inset 0 -1px 0 theme('colors.rule');
+  }
+}

@@ -1,2 +1,0 @@
-ALTER TABLE "user_preferences" ALTER COLUMN "article_view" SET DEFAULT 'overlay';--> statement-breakpoint
-ALTER TABLE "user_preferences" ADD COLUMN IF NOT EXISTS "article_width" varchar(20) DEFAULT 'wide' NOT NULL;

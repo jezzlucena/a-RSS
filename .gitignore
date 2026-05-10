@@ -1,32 +1,18 @@
-# Dependencies
-node_modules
-.pnpm-store
-
-# Build outputs
-dist
-.turbo
-
-# Environment
+node_modules/
+dist/
+build/
+*.log
+.DS_Store
 .env
 .env.local
 .env.*.local
+.vite/
+coverage/
 
-# IDE
-.idea
-.vscode
-*.swp
-*.swo
-.DS_Store
-
-# Logs
-logs
-*.log
-npm-debug.log*
-pnpm-debug.log*
-
-# Testing
-coverage
-.nyc_output
-
-# Misc
-*.tsbuildinfo
+# iOS
+ios/aRSS.xcodeproj/
+ios/**/build/
+ios/**/DerivedData/
+ios/**/*.xcuserstate
+ios/**/xcuserdata/
+ios/**/.swiftpm/

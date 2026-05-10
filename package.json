@@ -1,32 +1,23 @@
 {
-  "name": "arss",
+  "name": "a-rss",
   "version": "0.1.0",
   "private": true,
-  "description": "a-RSS - Another RSS Software Solution",
+  "description": "Another RSS Software Solution — RSS reader that summarizes entries into 3 bullets via Claude.",
   "scripts": {
-    "dev": "turbo run dev",
-    "build": "turbo run build",
-    "lint": "turbo run lint",
-    "test": "turbo run test",
-    "typecheck": "turbo run typecheck",
-    "docker:infra": "docker compose --profile infra up -d",
-    "docker:infra:down": "docker compose --profile infra down",
-    "docker:infra:logs": "docker compose --profile infra logs -f",
-    "docker:prod:build": "docker compose --profile infra --profile app build",
-    "docker:prod:up": "docker compose --profile infra --profile app up -d",
-    "docker:prod:down": "docker compose --profile infra --profile app down",
-    "docker:prod:logs": "docker compose --profile infra --profile app logs -f",
-    "db:generate": "turbo run db:generate --filter=@arss/api",
-    "db:migrate": "turbo run db:migrate --filter=@arss/api",
-    "db:studio": "turbo run db:studio --filter=@arss/api",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "dev": "pnpm -r --parallel run dev",
+    "dev:api": "pnpm --filter @a-rss/api dev",
+    "dev:web": "pnpm --filter @a-rss/web dev",
+    "build": "pnpm -r run build",
+    "build:api": "pnpm --filter @a-rss/api build",
+    "build:web": "pnpm --filter @a-rss/web build",
+    "build:shared": "pnpm --filter @a-rss/shared build",
+    "lint": "pnpm -r run lint",
+    "test": "pnpm -r run test",
+    "clean": "pnpm -r run clean && rm -rf node_modules"
   },
-  "devDependencies": {
-    "turbo": "^2.3.3",
-    "typescript": "^5.7.3"
-  },
-  "packageManager": "pnpm@9.15.4",
   "engines": {
-    "node": ">=20"
-  }
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0"
 }

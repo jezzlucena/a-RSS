@@ -1,24 +1,49 @@
-import { RouterProvider } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { router } from './router';
-import { ToastContainer } from '@/components/ui';
+import { useEffect } from 'react';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { useAuthStore } from '@/stores/auth';
+import { RequireAuth } from '@/components/RequireAuth';
+import { Layout } from '@/components/Layout';
+import LoginPage from '@/pages/Login';
+import SignupPage from '@/pages/Signup';
+import MagicConsumePage from '@/pages/MagicConsume';
+import FeedPage from '@/pages/Feed';
+import SourcesPage from '@/pages/Sources';
+import CategoriesPage from '@/pages/Categories';
+import SettingsPage from '@/pages/Settings';
+import EntryDetailPage from '@/pages/EntryDetail';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 1,
-    },
-  },
-});
+export default function App() {
+  const hydrate = useAuthStore((s) => s.hydrate);
 
-function App() {
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-      <ToastContainer />
-    </QueryClientProvider>
+    <Routes>
+      <Route path="/auth/login" element={<LoginPage />} />
+      <Route path="/auth/signup" element={<SignupPage />} />
+      <Route path="/auth/magic" element={<MagicConsumePage />} />
+
+      <Route
+        element={
+          <RequireAuth>
+            <Layout>
+              <Outlet />
+            </Layout>
+          </RequireAuth>
+        }
+      >
+        <Route path="/" element={<Navigate to="/feed/all" replace />} />
+        <Route path="/feed/all" element={<FeedPage />} />
+        <Route path="/feed/:viewKind/:viewId" element={<FeedPage />} />
+        <Route path="/sources" element={<SourcesPage />} />
+        <Route path="/categories" element={<CategoriesPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/entries/:id" element={<EntryDetailPage />} />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/feed/all" replace />} />
+    </Routes>
   );
 }
-
-export default App;

@@ -3,17 +3,12 @@
     "target": "ES2022",
     "lib": ["ES2022"],
     "module": "ESNext",
-    "skipLibCheck": true,
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "noEmit": true,
+    "allowSyntheticDefaultImports": true,
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "skipLibCheck": true,
+    "composite": true,
+    "outDir": "./dist-node"
   },
   "include": ["vite.config.ts"]
 }

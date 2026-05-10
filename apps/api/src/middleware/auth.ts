@@ -1,54 +1,32 @@
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { env } from '../config/env.js';
-import { AppError } from './errorHandler.js';
-
-export interface AuthPayload {
-  userId: string;
-  email: string;
-}
+import type { Request, RequestHandler } from 'express';
+import { verifyAccessToken } from '../services/tokens.js';
+import { HttpError } from './errors.js';
 
 declare global {
   namespace Express {
     interface Request {
-      user?: AuthPayload;
+      userId?: string;
     }
   }
 }
+export {};
 
-export function authenticate(req: Request, _res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new AppError(401, 'Authentication required');
+export const requireAuth: RequestHandler = (req, _res, next) => {
+  const auth = req.header('authorization');
+  if (!auth?.startsWith('Bearer ')) {
+    return next(new HttpError(401, 'unauthorized', 'Missing bearer token'));
   }
-
-  const token = authHeader.split(' ')[1];
-
+  const token = auth.slice('Bearer '.length).trim();
   try {
-    const decoded = jwt.verify(token, env.JWT_SECRET) as AuthPayload;
-    req.user = decoded;
+    const payload = verifyAccessToken(token);
+    req.userId = payload.sub;
     next();
-  } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
-      throw new AppError(401, 'Token expired');
-    }
-    throw new AppError(401, 'Invalid token');
+  } catch {
+    next(new HttpError(401, 'invalid_token', 'Access token is invalid or expired'));
   }
-}
+};
 
-export function generateAccessToken(payload: AuthPayload): string {
-  return jwt.sign(payload, env.JWT_SECRET, {
-    expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'],
-  });
-}
-
-export function generateRefreshToken(payload: AuthPayload): string {
-  return jwt.sign(payload, env.JWT_REFRESH_SECRET, {
-    expiresIn: env.JWT_REFRESH_EXPIRES_IN as jwt.SignOptions['expiresIn'],
-  });
-}
-
-export function verifyRefreshToken(token: string): AuthPayload {
-  return jwt.verify(token, env.JWT_REFRESH_SECRET) as AuthPayload;
+export function getUserId(req: Request): string {
+  if (!req.userId) throw new HttpError(401, 'unauthorized');
+  return req.userId;
 }

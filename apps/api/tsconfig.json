@@ -1,17 +1,11 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "rootDir": "src",
-    "outDir": "dist",
-    "noEmit": false,
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "target": "ES2022",
-    "lib": ["ES2022"],
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": false
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

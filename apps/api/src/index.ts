@@ -1,98 +1,79 @@
-import 'dotenv/config';
 import express from 'express';
+// Patches Express 4 so async-route throws/rejections forward to the error middleware
+// instead of becoming unhandled promise rejections (which crash Node 20+ by default).
+// MUST be imported before any router is created. Express 5 won't need this.
+import 'express-async-errors';
 import cors from 'cors';
 import helmet from 'helmet';
-import compression from 'compression';
-import swaggerUi from 'swagger-ui-express';
+import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
+import pinoHttp from 'pino-http';
+import { randomUUID } from 'node:crypto';
 import { env } from './config/env.js';
-import { errorHandler } from './middleware/errorHandler.js';
-import { logger } from './lib/logger.js';
-import {
-  generalLimiter,
-  requestLoggingMiddleware,
-  securityHeaders,
-  sanitizeRequest,
-  getCorsOptions,
-} from './middleware/security.js';
-import authRoutes from './routes/auth.js';
-import feedRoutes from './routes/feeds.js';
-import categoryRoutes from './routes/categories.js';
-import articleRoutes from './routes/articles.js';
-import preferencesRoutes from './routes/preferences.js';
-import searchRoutes from './routes/search.js';
-import { openApiSpec } from './docs/openapi.js';
+import { connectDatabase, disconnectDatabase } from './config/database.js';
+import { errorHandler, notFoundHandler } from './middleware/errors.js';
+import { initAgenda, shutdownAgenda } from './services/agendaService.js';
+import { logger } from './services/logger.js';
+import routes from './routes/index.js';
 
 const app = express();
 
-// Trust proxy for correct IP detection behind load balancers
+app.use(helmet());
+app.use(cors({
+  origin: env.CORS_ALLOWLIST.split(',').map(s => s.trim()),
+  credentials: true,
+}));
+app.use(rateLimit({ windowMs: 60_000, max: 300, standardHeaders: true, legacyHeaders: false }));
+
+app.use(
+  pinoHttp({
+    logger,
+    genReqId: (req) => (req.headers['x-request-id'] as string | undefined) ?? randomUUID(),
+    customLogLevel: (_req, res, err) => {
+      if (err || res.statusCode >= 500) return 'error';
+      if (res.statusCode >= 400) return 'warn';
+      return 'info';
+    },
+    customSuccessMessage: (req, res) => `${req.method} ${req.url} → ${res.statusCode}`,
+    serializers: {
+      req: (req) => ({ id: req.id, method: req.method, url: req.url }),
+      res: (res) => ({ statusCode: res.statusCode }),
+    },
+  }),
+);
+
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+
 app.set('trust proxy', 1);
 
-// Request logging
-app.use(requestLoggingMiddleware);
+app.use('/api/v1', routes);
 
-// Security middleware
-app.use(helmet({
-  contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false,
-  crossOriginEmbedderPolicy: false,
-}));
-app.use(securityHeaders);
-app.use(cors(getCorsOptions()));
-
-// Compression for responses
-app.use(compression());
-
-// Rate limiting
-app.use(generalLimiter);
-
-// Request sanitization
-app.use(sanitizeRequest);
-
-// Body parsing
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// Health check
-app.get('/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// API Documentation
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, {
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'a-RSS API Documentation',
-}));
-
-// OpenAPI spec endpoint
-app.get('/api/openapi.json', (_req, res) => {
-  res.json(openApiSpec);
-});
-
-// API routes
-app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/feeds', feedRoutes);
-app.use('/api/v1/categories', categoryRoutes);
-app.use('/api/v1/articles', articleRoutes);
-app.use('/api/v1/preferences', preferencesRoutes);
-app.use('/api/v1/search', searchRoutes);
-
-// 404 handler
-app.use((_req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'Not found',
-  });
-});
-
-// Error handler
+app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Start server
-app.listen(env.API_PORT, () => {
-  logger.info('Server started', { port: env.API_PORT, url: `http://localhost:${env.API_PORT}` });
-  logger.info('Environment', { nodeEnv: env.NODE_ENV });
-});
+async function shutdown(): Promise<void> {
+  logger.info('shutting down');
+  await shutdownAgenda();
+  await disconnectDatabase();
+  process.exit(0);
+}
 
-export default app;
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+
+async function start(): Promise<void> {
+  try {
+    await connectDatabase();
+    await initAgenda();
+    app.listen(env.API_PORT, () => {
+      logger.info({ port: env.API_PORT, env: env.NODE_ENV }, 'a-rss api listening');
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'failed to start');
+    process.exit(1);
+  }
+}
+
+start();
