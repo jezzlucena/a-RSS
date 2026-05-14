@@ -1,22 +1,54 @@
 version: '3.8'
 
-# Dev services. Run api/web locally with hot reload; this brings up Mongo + MinIO only.
+# Dev services. `docker compose up` brings up Mongo, MinIO, and an optional
+# `dev` container running `pnpm run dev` (api + web + shared with hot reload).
+# Web is exposed on host port 8088, api on 5088.
 
 services:
   mongo:
     image: mongo:7
     container_name: arss-mongo
+    command: ["mongod", "--port", "27020"]
     volumes:
       - arss-mongo-data:/data/db
     ports:
-      - "27017:27017"
+      - "27020:27020"
     environment:
       MONGO_INITDB_DATABASE: arss
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/arss --quiet
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27020/arss --quiet
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  dev:
+    image: node:20-bookworm-slim
+    container_name: arss-dev
+    working_dir: /app
+    command:
+      - bash
+      - -lc
+      - |
+        corepack enable && \
+        corepack prepare pnpm@9.15.0 --activate && \
+        pnpm install --frozen-lockfile && \
+        pnpm run dev
+    env_file:
+      - ./.env
+    volumes:
+      - .:/app
+      - arss-dev-node-modules:/app/node_modules
+    ports:
+      - "8088:5173"  # web (vite)
+      - "5088:4000"  # api (express)
+    depends_on:
+      mongo:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      ladder:
+        condition: service_started
     restart: unless-stopped
 
   minio:
@@ -37,7 +69,49 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+  
+  ladder:
+    image: ghcr.io/everywall/ladder:latest
+    container_name: ladder
+    build: .
+    #restart: always
+    #command: sh -c ./ladder
+    environment:
+      - PORT=8190
+      - RULESET=/app/ruleset.yaml
+      #- ALLOWED_DOMAINS=example.com,example.org
+      #- ALLOWED_DOMAINS_RULESET=false
+      #- EXPOSE_RULESET=true
+      #- PREFORK=false
+      #- DISABLE_FORM=false
+      #- FORM_PATH=/app/form.html
+      #- X_FORWARDED_FOR=66.249.66.1
+      #- USER_AGENT=Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+      #- USERPASS=foo:bar
+      - LOG_URLS=true
+      #- GODEBUG=netdns=go
+      - FLARESOLVERR_HOST=http://flaresolverr:8191
+    ports:
+      - "8190:8190"
+    volumes:
+      - ./ruleset.yaml:/app/ruleset.yaml
+      - ./handlers/form.html:/app/form.html
+  
+  # Optional FlareSolverr service for Cloudflare bypass
+  # Uncomment the following lines to enable FlareSolverr
+  flaresolverr:
+   image: ghcr.io/flaresolverr/flaresolverr:latest
+   container_name: flaresolverr
+   restart: unless-stopped
+   environment:
+     - LOG_LEVEL=info
+     - LOG_HTML=false
+     - CAPTCHA_SOLVER=none
+     - TZ=UTC
+   ports:
+     - "8191:8191"
 
 volumes:
   arss-mongo-data:
   arss-minio-data:
+  arss-dev-node-modules:
