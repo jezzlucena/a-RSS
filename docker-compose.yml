@@ -31,12 +31,18 @@ services:
     env_file:
       - ./.env
     environment:
-      - NODE_ENV=production
       - MONGO_URL=mongodb://mongo:27020/arss
       - LADDER_URL=http://ladder:8190
     volumes:
       - .:/app
+      # Container-owned node_modules (root + each workspace package), so the
+      # bind-mounted host dirs never shadow them and pnpm install fully controls
+      # dependency resolution. Without the per-package volumes, a stale host
+      # apps/*/node_modules hides newly added deps (e.g. react-toastify).
       - arss-dev-node-modules:/app/node_modules
+      - arss-dev-web-node-modules:/app/apps/web/node_modules
+      - arss-dev-api-node-modules:/app/apps/api/node_modules
+      - arss-dev-shared-node-modules:/app/packages/shared/node_modules
     ports:
       - "8088:5173"  # web (vite)
       - "5088:4000"  # api (express)
@@ -112,3 +118,6 @@ volumes:
   arss-mongo-data:
   arss-minio-data:
   arss-dev-node-modules:
+  arss-dev-web-node-modules:
+  arss-dev-api-node-modules:
+  arss-dev-shared-node-modules:
