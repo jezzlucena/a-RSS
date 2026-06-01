@@ -4,13 +4,13 @@
   "private": true,
   "description": "Another RSS Software Solution — RSS reader that summarizes entries into 3 bullets via Claude.",
   "scripts": {
-    "dev": "pnpm -r --parallel run dev",
-    "dev:api": "pnpm --filter @a-rss/api dev",
-    "dev:web": "pnpm --filter @a-rss/web dev",
-    "build": "pnpm -r run build",
-    "build:api": "pnpm --filter @a-rss/api build",
-    "build:web": "pnpm --filter @a-rss/web build",
-    "build:shared": "pnpm --filter @a-rss/shared build",
+    "dev": "dotenv -e .env -- pnpm -r --parallel run dev",
+    "dev:api": "dotenv -e .env -- pnpm --filter @a-rss/api dev",
+    "dev:web": "dotenv -e .env -- pnpm --filter @a-rss/web dev",
+    "build": "dotenv -e .env -- pnpm -r run build",
+    "build:api": "dotenv -e .env -- pnpm --filter @a-rss/api build",
+    "build:web": "dotenv -e .env -- pnpm --filter @a-rss/web build",
+    "build:shared": "dotenv -e .env -- pnpm --filter @a-rss/shared build",
     "lint": "pnpm -r run lint",
     "test": "pnpm -r run test",
     "clean": "pnpm -r run clean && rm -rf node_modules"
@@ -19,5 +19,8 @@
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
   },
-  "packageManager": "pnpm@9.15.0"
+  "packageManager": "pnpm@9.15.0",
+  "devDependencies": {
+    "dotenv-cli": "^11.0.0"
+  }
 }

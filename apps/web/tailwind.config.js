@@ -8,14 +8,18 @@ export default {
         sans: ['"Geist"', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
+      // Colors resolve through CSS variables (RGB channels) defined in index.css,
+      // so flipping the `.dark` class on <html> re-themes every text-ink/bg-paper/…
+      // utility with no markup changes. The `<alpha-value>` form keeps opacity
+      // modifiers (e.g. bg-ink/40, text-ink/85) working.
       colors: {
-        paper: '#F4F1EA',
-        'paper-deep': '#ECE6D8',
-        ink: '#0E0E0C',
-        muted: '#6E665A',
-        rule: '#D6CFC1',
-        vermilion: '#C9412B',
-        'vermilion-deep': '#9F2A19',
+        paper: 'rgb(var(--color-paper) / <alpha-value>)',
+        'paper-deep': 'rgb(var(--color-paper-deep) / <alpha-value>)',
+        ink: 'rgb(var(--color-ink) / <alpha-value>)',
+        muted: 'rgb(var(--color-muted) / <alpha-value>)',
+        rule: 'rgb(var(--color-rule) / <alpha-value>)',
+        vermilion: 'rgb(var(--color-vermilion) / <alpha-value>)',
+        'vermilion-deep': 'rgb(var(--color-vermilion-deep) / <alpha-value>)',
       },
       letterSpacing: {
         chip: '0.16em',

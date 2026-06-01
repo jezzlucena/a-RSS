@@ -3,9 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#F4F1EA" />
     <title>a-RSS</title>
+    <!-- Apply the saved theme before paint to avoid a light/dark flash, and set the
+         mobile browser chrome color (theme-color) to match the app background. -->
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem('arss-theme') || 'system';
+          var dark =
+            pref === 'dark' ||
+            (pref === 'system' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.classList.add('dark');
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', dark ? '#171510' : '#F4F1EA');
+        } catch (e) {}
+      })();
+    </script>
   </head>
-  <body class="bg-neutral-50 text-neutral-900">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

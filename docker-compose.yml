@@ -36,6 +36,10 @@ services:
         pnpm run dev
     env_file:
       - ./.env
+    environment:
+      - NODE_ENV=production
+      - MONGO_URL=mongodb://mongo:27020/arss
+      - LADDER_URL=http://ladder:8190
     volumes:
       - .:/app
       - arss-dev-node-modules:/app/node_modules
@@ -74,7 +78,6 @@ services:
     image: ghcr.io/everywall/ladder:latest
     container_name: ladder
     build: .
-    #restart: always
     #command: sh -c ./ladder
     environment:
       - PORT=8190
@@ -96,6 +99,7 @@ services:
     volumes:
       - ./ruleset.yaml:/app/ruleset.yaml
       - ./handlers/form.html:/app/form.html
+    restart: unless-stopped
   
   # Optional FlareSolverr service for Cloudflare bypass
   # Uncomment the following lines to enable FlareSolverr

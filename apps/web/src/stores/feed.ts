@@ -9,6 +9,7 @@ import type {
   BulkMarkReadResponse,
   ProcessingState,
 } from '@a-rss/shared';
+import { toast } from 'react-toastify';
 import { api } from '@/lib/api';
 import { useSourcesStore } from '@/stores/sources';
 
@@ -35,6 +36,9 @@ interface FeedState {
   setFilter: (filter: FeedFilter) => void;
   loadInitial: () => Promise<void>;
   loadMore: () => Promise<void>;
+  /** Background, scroll-friendly refresh: merges the latest page into the existing
+   *  list in place (no blank-then-refill) so the view never jumps to the top. */
+  refresh: () => Promise<void>;
   markBulkRead: (scope: BulkMarkReadScope) => Promise<number>;
   summarizeEntry: (id: string) => Promise<EntrySummary | null>;
   toggleRead: (id: string) => Promise<boolean>;
@@ -65,7 +69,7 @@ async function fetchPage(
 export const useFeedStore = create<FeedState>((set, get) => ({
   view: 'all',
   order: 'desc',
-  filter: 'all',
+  filter: 'unread',
   entries: [],
   cursor: null,
   unreadCount: 0,
@@ -88,7 +92,8 @@ export const useFeedStore = create<FeedState>((set, get) => ({
       const data = await fetchPage(view, order, filter, null);
       set({ entries: data.entries, cursor: data.nextCursor, unreadCount: data.unreadCount });
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : 'Fetch failed' });
+      // User-triggered (Fetch button) → transient toast rather than a sticky banner.
+      toast.error(err instanceof Error ? err.message : 'Fetch failed');
     } finally {
       set({ polling: false });
     }
@@ -143,6 +148,33 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     }
   },
 
+  refresh: async () => {
+    const { view, order, filter, entries, loading } = get();
+    // Don't fight an in-flight load/poll; those own the list.
+    if (loading || get().polling) return;
+    try {
+      const data = await fetchPage(view, order, filter, null);
+
+      // Update entries we already have in place — keep their position and any
+      // locally-authoritative state (read flag, a summary the user already loaded)
+      // so a passive refresh never un-reads an article or drops a summary.
+      const incomingById = new Map(data.entries.map((e) => [e.id, e]));
+      const merged = entries.map((e) => {
+        const fresh = incomingById.get(e.id);
+        if (!fresh) return e;
+        return { ...fresh, isRead: e.isRead, summary: e.summary ?? fresh.summary };
+      });
+
+      // Genuinely-new entries (not yet in the list) go at the front, in server order.
+      const existingIds = new Set(entries.map((e) => e.id));
+      const fresh = data.entries.filter((e) => !existingIds.has(e.id));
+
+      set({ entries: [...fresh, ...merged], unreadCount: data.unreadCount });
+    } catch {
+      // Background refresh — surface nothing on failure; the next tick retries.
+    }
+  },
+
   toggleRead: async (id) => {
     const entry = get().entries.find((e) => e.id === id);
     if (!entry) return false;
@@ -176,8 +208,8 @@ export const useFeedStore = create<FeedState>((set, get) => ({
         entries: get().entries.map((e) => (e.id === id ? { ...e, isRead: !next } : e)),
         unreadCount: Math.max(0, get().unreadCount + (next ? 1 : -1)),
         manuallyUnreadIds: revertSet,
-        error: err instanceof Error ? err.message : 'Could not update read state',
       });
+      toast.error(err instanceof Error ? err.message : 'Could not update read state');
       return entry.isRead;
     }
   },
@@ -192,7 +224,7 @@ export const useFeedStore = create<FeedState>((set, get) => ({
         ),
       });
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : 'Retry failed' });
+      toast.error(err instanceof Error ? err.message : 'Retry failed');
     }
   },
 
@@ -212,32 +244,38 @@ export const useFeedStore = create<FeedState>((set, get) => ({
         ),
       });
       return response.summary;
-    } catch (err) {
-      set({ error: err instanceof Error ? err.message : 'Could not summarize' });
+    } catch {
+      // The EntryCard surfaces this inline in the expanded body (contextual),
+      // so no global banner/toast here.
       return null;
     }
   },
 
   markBulkRead: async (scope) => {
     const { view, filter, entries } = get();
-    const result = await api<BulkMarkReadResponse>('/feeds/mark-read', {
-      method: 'POST',
-      body: { view, scope },
-    });
-    // Optimistically mark the ones currently visible that match the scope.
-    const cutoff =
-      scope === 'olderThan1d'
-        ? Date.now() - 86_400_000
-        : scope === 'olderThan7d'
-          ? Date.now() - 7 * 86_400_000
-          : Infinity;
-    const updated = entries.map((e) =>
-      new Date(e.publishedAt).getTime() <= cutoff ? { ...e, isRead: true } : e,
-    );
-    // In unread-only mode, the just-read entries should drop out of the list.
-    const visible = filter === 'unread' ? updated.filter((e) => !e.isRead) : updated;
-    set({ entries: visible, unreadCount: Math.max(0, get().unreadCount - result.marked) });
-    refreshSidebarCounts();
-    return result.marked;
+    try {
+      const result = await api<BulkMarkReadResponse>('/feeds/mark-read', {
+        method: 'POST',
+        body: { view, scope },
+      });
+      // Optimistically mark the ones currently visible that match the scope.
+      const cutoff =
+        scope === 'olderThan1d'
+          ? Date.now() - 86_400_000
+          : scope === 'olderThan7d'
+            ? Date.now() - 7 * 86_400_000
+            : Infinity;
+      const updated = entries.map((e) =>
+        new Date(e.publishedAt).getTime() <= cutoff ? { ...e, isRead: true } : e,
+      );
+      // In unread-only mode, the just-read entries should drop out of the list.
+      const visible = filter === 'unread' ? updated.filter((e) => !e.isRead) : updated;
+      set({ entries: visible, unreadCount: Math.max(0, get().unreadCount - result.marked) });
+      refreshSidebarCounts();
+      return result.marked;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not mark entries read');
+      return 0;
+    }
   },
 }));

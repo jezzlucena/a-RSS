@@ -25,6 +25,7 @@ export default function FeedPage() {
   const setFilter = useFeedStore((s) => s.setFilter);
   const loadInitial = useFeedStore((s) => s.loadInitial);
   const loadMore = useFeedStore((s) => s.loadMore);
+  const refresh = useFeedStore((s) => s.refresh);
   const markBulkRead = useFeedStore((s) => s.markBulkRead);
   const toggleRead = useFeedStore((s) => s.toggleRead);
 
@@ -129,16 +130,44 @@ export default function FeedPage() {
     return () => obs.disconnect();
   }, [cursor, loadMore]);
 
+  // --- Passive refresh ---------------------------------------------------
+  // New stories arrive on their own via a gentle interval and on tab refocus,
+  // merged in place by store.refresh (no blank-then-refill).
+  useEffect(() => {
+    const REFRESH_MS = 60_000;
+    let timer: number | undefined;
+    const stop = () => {
+      if (timer !== undefined) {
+        clearInterval(timer);
+        timer = undefined;
+      }
+    };
+    const start = () => {
+      stop();
+      timer = window.setInterval(() => {
+        if (!document.hidden) void refresh();
+      }, REFRESH_MS);
+    };
+    const onVisibility = () => {
+      if (document.hidden) {
+        stop();
+      } else {
+        void refresh();
+        start();
+      }
+    };
+    start();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+    // Re-arm when the view/order/filter changes so we always refresh the current slice.
+  }, [refresh, view, order, filter]);
+
   const kicker =
     view === 'all'
-      ? 'All sources'
-      : view.startsWith('category:')
-        ? 'Category'
-        : 'Source';
-
-  const title =
-    view === 'all'
-      ? 'All sources'
+      ? 'All Sources'
       : view.startsWith('category:')
         ? categories.find((c) => `category:${c.id}` === view)?.name ?? 'Category'
         : sources.find((s) => `source:${s.id}` === view)?.title ?? 'Source';
@@ -147,70 +176,54 @@ export default function FeedPage() {
     <div>
       {/* Masthead */}
       <header className="border-b-2 border-ink pb-6">
-        <div className="flex flex-wrap items-end justify-between gap-6">
+        <div className="flex flex-wrap items-center justify-between gap-6">
           <div className="min-w-0">
-            <p className="font-mono text-chip uppercase text-muted">
+            <p className="font-mono text-sm text-ink">
               {kicker}
-              <span className="mx-2 text-rule">·</span>
-              <span className="text-ink">
-                {unreadCount} unread
-                {loading && entries.length === 0 ? ' · loading' : ''}
+              <span className="bg-ink text-[10px] text-paper rounded-full ml-2 px-1.5 py-0.5">
+                {unreadCount}
               </span>
             </p>
-            <h1 className="font-display mt-3 text-5xl font-semibold leading-[0.95] tracking-tight">
-              {title}
-            </h1>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1">
             <FetchButton />
             <button
               onClick={() => useFeedStore.setState({ order: order === 'desc' ? 'asc' : 'desc' })}
-              className="border border-ink px-4 py-2 font-mono text-chip uppercase text-ink transition-colors hover:bg-ink hover:text-paper focus:bg-ink focus:text-paper"
-              title="Toggle sort order"
+              aria-label={order === 'desc' ? 'Sorted newest first — switch to oldest first' : 'Sorted oldest first — switch to newest first'}
+              className="border border-ink px-3 pr-5 py-2 font-mono text-base text-xs leading-4 text-ink transition-colors hover:bg-ink hover:text-paper focus:bg-ink focus:text-paper"
+              title={order === 'desc' ? 'Newest first (click for oldest)' : 'Oldest first (click for newest)'}
             >
-              <span aria-hidden className="mr-2">{order === 'desc' ? '↓' : '↑'}</span>
-              {order === 'desc' ? 'Newest' : 'Oldest'}
+              <span aria-hidden>↑ {order === 'desc' ? 'New' : 'Old'}</span>
             </button>
-            <div className="relative">
-              <select
-                value={filter}
-                onChange={(e) => {
-                  setFilter(e.target.value as 'all' | 'unread');
-                  void loadInitial();
-                }}
-                className="appearance-none border border-ink bg-paper px-4 py-2 pr-9 font-mono text-chip uppercase text-ink transition-colors hover:bg-ink hover:text-paper focus:bg-ink focus:text-paper focus:outline-none cursor-pointer"
-                title="Filter entries"
-              >
-                <option value="all">All</option>
-                <option value="unread">Unread only</option>
-              </select>
-              <span
-                aria-hidden
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-mono text-chip text-ink"
-              >
-                ⌄
-              </span>
-            </div>
             <div className="relative">
               <button
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
-                className="bg-ink px-4 py-2 font-mono text-chip uppercase text-paper transition-colors hover:bg-vermilion-deep focus:bg-vermilion-deep"
+                className="appearance-none border border-ink bg-paper px-3 pr-7 font-mono text-base leading-[32px] transition-colors hover:bg-vermilion-deep focus:bg-vermilion-deep"
               >
-                Mark read
-                <span aria-hidden className="ml-2">⌄</span>
+                ✔
+                <span aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-[65%] font-mono text-lg text-ink">
+                  ⌄
+                </span>
               </button>
               {menuOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 z-10 mt-1 w-64 border border-ink bg-paper-deep"
+                  className="absolute right-0 z-10 mt-1 w-28 border border-ink bg-paper-deep"
                 >
+                  <a
+                    key="title"
+                    role="menuitem"
+                    className="block w-full border-b border-rule px-4 py-3 text-left text-xs text-muted text-ink"
+                  >
+                    Mark read
+                  </a>
                   {(
                     [
-                      ['all', 'All entries in this view'],
-                      ['olderThan1d', '1 day or older'],
-                      ['olderThan7d', '7 days or older'],
+                      ['all', 'All Here'],
+                      ['olderThan1d', '1+ Days'],
+                      ['olderThan7d', '7+ Days'],
                     ] as const
                   ).map(([scope, label]) => (
                     <button
@@ -228,19 +241,29 @@ export default function FeedPage() {
                 </div>
               )}
             </div>
+            <div className="relative">
+              <select
+                value={filter}
+                onChange={(e) => {
+                  setFilter(e.target.value as 'all' | 'unread');
+                  void loadInitial();
+                }}
+                className="appearance-none border border-ink bg-paper text-xs h-[34px] px-3 pr-7 font-mono text-base leading-none transition-colors hover:bg-ink hover:text-paper focus:bg-ink focus:text-paper focus:outline-none cursor-pointer"
+                title="Filter entries"
+              >
+                <option value="all">All</option>
+                <option value="unread">Unread</option>
+              </select>
+              <span
+                aria-hidden
+                className="pointer-events-none absolute right-3 top-1/2 -translate-y-[65%] font-mono text-lg text-ink"
+              >
+                ⌄
+              </span>
+            </div>
           </div>
         </div>
       </header>
-
-      <p className="mt-4 font-mono text-[11px] uppercase tracking-chip text-muted">
-        <Kbd>j</Kbd>/<Kbd>k</Kbd> navigate
-        <span className="mx-3 text-rule">·</span>
-        <Kbd>m</Kbd> mark read
-        <span className="mx-3 text-rule">·</span>
-        <Kbd>f</Kbd> full article
-        <span className="mx-3 text-rule">·</span>
-        <Kbd>o</Kbd> open source
-      </p>
 
       {error && (
         <p
@@ -292,28 +315,22 @@ function EmptyState() {
 
 function FetchButton() {
   const polling = useFeedStore((s) => s.polling);
+  const loading = useFeedStore((s) => s.loading);
   const pollFeed = useFeedStore((s) => s.pollFeed);
   return (
     <button
       type="button"
       onClick={() => void pollFeed()}
-      disabled={polling}
-      className="border border-ink px-4 py-2 font-mono text-chip uppercase text-ink transition-colors hover:bg-ink hover:text-paper focus:bg-ink focus:text-paper disabled:cursor-progress disabled:opacity-60"
+      disabled={polling || loading}
+      aria-label={polling || loading ? 'Fetching new stories…' : 'Fetch new stories'}
+      className="border border-ink px-3 py-2 font-mono text-base leading-none text-ink transition-colors hover:bg-ink hover:text-paper focus:bg-ink focus:text-paper disabled:cursor-progress disabled:opacity-60"
       title="Trigger a poll cycle for this view's sources"
     >
-      <span aria-hidden className={`mr-2 inline-block ${polling ? 'animate-spin' : ''}`}>↻</span>
-      {polling ? 'Fetching…' : 'Fetch'}
+      <span aria-hidden className={`inline-block ${polling || loading ? 'animate-spin' : ''}`}>↻</span>
     </button>
   );
 }
 
-function Kbd({ children }: { children: React.ReactNode }) {
-  return (
-    <kbd className="mx-1 rounded border border-rule bg-paper-deep px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-ink">
-      {children}
-    </kbd>
-  );
-}
 
 function EntryCard({
   entry,
@@ -421,7 +438,7 @@ function EntryCard({
       } ${isExpanded ? 'scroll-mt-6' : ''}`}
     >
       {/* Metadata row */}
-      <div className="flex items-baseline justify-between gap-4">
+      <div className="flex items-center justify-between gap-4">
         <p className="font-mono text-chip uppercase text-muted">
           <span className="text-ink">{entry.sourceTitle}</span>
           <span className="mx-2 text-rule">·</span>
@@ -447,12 +464,35 @@ function EntryCard({
             </>
           )}
         </p>
-        {!entry.isRead && (
-          <span
-            aria-label="Unread"
-            className="block h-2 w-2 flex-none rounded-full bg-vermilion"
-          />
-        )}
+        <div className="flex flex-none items-center gap-3">
+          {!entry.isRead && (
+            <span
+              aria-label="Unread"
+              className="block h-2 w-2 rounded-full bg-vermilion"
+            />
+          )}
+          <button
+            type="button"
+            onClick={(e) => {
+              // After a mouse click, drop focus so the button can't swallow a
+              // subsequent Space (page scroll) or Enter. Keyboard activation
+              // (detail === 0) keeps focus so Tab users stay oriented; the global
+              // j/k/m/f/o shortcuts fire regardless since a button isn't a typing target.
+              if (e.detail !== 0) e.currentTarget.blur();
+              void toggleRead(entry.id);
+            }}
+            aria-pressed={entry.isRead}
+            aria-label={entry.isRead ? 'Mark as unread' : 'Mark as read'}
+            title={entry.isRead ? 'Mark as unread' : 'Mark as read'}
+            className={`flex h-7 w-7 items-center justify-center rounded-full border text-sm leading-none transition-colors ${
+              entry.isRead
+                ? 'border-vermilion bg-vermilion text-paper hover:bg-vermilion-deep hover:border-vermilion-deep'
+                : 'border-rule text-muted hover:border-ink hover:text-ink'
+            }`}
+          >
+            <span aria-hidden>✔</span>
+          </button>
+        </div>
       </div>
 
       {/* Image above title, centered with a max-width — both clickable to toggle expansion. */}

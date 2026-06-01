@@ -1,6 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useAuthStore } from '@/stores/auth';
+import { useThemeStore, type ThemePreference } from '@/stores/theme';
 import { api } from '@/lib/api';
+
+const THEME_OPTIONS: ThemePreference[] = ['system', 'light', 'dark'];
 
 interface FailedEntry {
   id: string;
@@ -20,6 +23,8 @@ interface FailuresResponse {
 export default function SettingsPage() {
   const me = useAuthStore((s) => s.me);
   const logout = useAuthStore((s) => s.logout);
+  const themePreference = useThemeStore((s) => s.preference);
+  const setThemePreference = useThemeStore((s) => s.setPreference);
   const changePassword = useAuthStore((s) => s.changePassword);
   const setAnthropicApiKey = useAuthStore((s) => s.setAnthropicApiKey);
   const clearAnthropicApiKey = useAuthStore((s) => s.clearAnthropicApiKey);
@@ -166,6 +171,35 @@ export default function SettingsPage() {
         >
           Sign out
         </button>
+      </section>
+
+      <section className="mt-14 border-t-2 border-ink pt-8">
+        <h2 className="font-mono text-chip uppercase text-muted">Appearance</h2>
+        <h3 className="font-display mt-2 text-2xl font-semibold tracking-tight">Theme</h3>
+        <p className="mt-2 max-w-prose text-sm text-muted">
+          Choose how a-RSS looks. “System” follows your device’s light or dark setting.
+        </p>
+        <div
+          role="group"
+          aria-label="Theme"
+          className="mt-6 inline-flex border border-ink"
+        >
+          {THEME_OPTIONS.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => setThemePreference(opt)}
+              aria-pressed={themePreference === opt}
+              className={`border-l border-ink px-5 py-2 font-mono text-chip uppercase transition-colors first:border-l-0 ${
+                themePreference === opt
+                  ? 'bg-ink text-paper'
+                  : 'text-ink hover:bg-ink hover:text-paper'
+              }`}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="mt-14 border-t-2 border-ink pt-8">

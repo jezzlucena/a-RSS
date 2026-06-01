@@ -4,20 +4,41 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme palette as RGB channels. `.dark` on <html> swaps these and every
+   text-ink/bg-paper/… utility follows automatically (see tailwind.config.js). */
+:root {
+  --color-paper: 244 241 234; /* #F4F1EA */
+  --color-paper-deep: 236 230 216; /* #ECE6D8 */
+  --color-ink: 14 14 12; /* #0E0E0C */
+  --color-muted: 110 102 90; /* #6E665A */
+  --color-rule: 214 207 193; /* #D6CFC1 */
+  --color-vermilion: 201 65 43; /* #C9412B */
+  --color-vermilion-deep: 159 42 25; /* #9F2A19 */
+}
+.dark {
+  --color-paper: 23 21 16; /* #171510 — warm near-black base */
+  --color-paper-deep: 34 31 24; /* #221F18 — raised surfaces */
+  --color-ink: 237 232 220; /* #EDE8DC — warm off-white text/borders */
+  --color-muted: 150 140 124; /* #968C7C */
+  --color-rule: 56 50 42; /* #38322A — subtle dividers */
+  --color-vermilion: 226 84 58; /* #E2543A — brightened accent */
+  --color-vermilion-deep: 200 66 45; /* #C8422D */
+}
+
 @layer base {
   html {
-    background-color: theme('colors.paper');
-    color: theme('colors.ink');
+    background-color: rgb(var(--color-paper));
+    color: rgb(var(--color-ink));
     font-family: theme('fontFamily.sans');
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
   body {
-    background-color: theme('colors.paper');
+    background-color: rgb(var(--color-paper));
   }
   ::selection {
-    background-color: theme('colors.vermilion');
-    color: theme('colors.paper');
+    background-color: rgb(var(--color-vermilion));
+    color: rgb(var(--color-paper));
   }
   input,
   button,
@@ -26,7 +47,7 @@
     font: inherit;
   }
   *:focus-visible {
-    outline: 2px solid theme('colors.vermilion');
+    outline: 2px solid rgb(var(--color-vermilion));
     outline-offset: 2px;
     border-radius: 1px;
   }
@@ -43,4 +64,36 @@
   .hairline {
     box-shadow: inset 0 -1px 0 theme('colors.rule');
   }
+}
+
+/* react-toastify — themed to match the newspaper aesthetic (paper/ink/vermilion,
+   sharp corners, mono text). These rules load after the library's base CSS. */
+:root {
+  --toastify-font-family: theme('fontFamily.mono');
+  --toastify-color-light: rgb(var(--color-paper));
+  --toastify-text-color-light: rgb(var(--color-ink));
+  --toastify-color-error: rgb(var(--color-vermilion));
+  --toastify-color-progress-error: rgb(var(--color-vermilion));
+  --toastify-toast-bd-radius: 0;
+}
+.Toastify__toast {
+  border: 2px solid rgb(var(--color-ink));
+  border-radius: 0;
+  box-shadow: 4px 4px 0 rgb(var(--color-ink) / 0.1);
+  font-family: theme('fontFamily.mono');
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgb(var(--color-ink));
+}
+/* Error toasts get the same vermilion left accent as the inline alert. */
+.Toastify__toast--error {
+  border-color: rgb(var(--color-ink));
+  border-left: 3px solid rgb(var(--color-vermilion));
+}
+.Toastify__close-button {
+  color: rgb(var(--color-muted));
+  opacity: 0.8;
+}
+.Toastify__progress-bar {
+  height: 2px;
 }

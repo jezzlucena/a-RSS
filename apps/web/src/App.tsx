@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
 import { useAuthStore } from '@/stores/auth';
+import { useThemeStore } from '@/stores/theme';
 import { RequireAuth } from '@/components/RequireAuth';
 import { Layout } from '@/components/Layout';
 import LoginPage from '@/pages/Login';
@@ -19,8 +21,18 @@ export default function App() {
     hydrate();
   }, [hydrate]);
 
+  // Keep the resolved theme in sync, and follow the OS when preference is "system".
+  useEffect(() => {
+    useThemeStore.getState().applyCurrent();
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => useThemeStore.getState().applyCurrent();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
   return (
-    <Routes>
+    <>
+      <Routes>
       <Route path="/auth/login" element={<LoginPage />} />
       <Route path="/auth/signup" element={<SignupPage />} />
       <Route path="/auth/magic" element={<MagicConsumePage />} />
@@ -44,6 +56,17 @@ export default function App() {
       </Route>
 
       <Route path="*" element={<Navigate to="/feed/all" replace />} />
-    </Routes>
+      </Routes>
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        newestOnTop
+        closeOnClick
+        pauseOnHover
+        draggable
+        theme="light"
+        icon={false}
+      />
+    </>
   );
 }
