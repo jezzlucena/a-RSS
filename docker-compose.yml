@@ -27,7 +27,7 @@ services:
         corepack enable && \
         corepack prepare pnpm@9.15.0 --activate && \
         pnpm install --frozen-lockfile && \
-        pnpm run dev
+        pnpm -r --parallel run dev
     env_file:
       - ./.env
     environment:
