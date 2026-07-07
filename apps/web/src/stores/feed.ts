@@ -25,6 +25,9 @@ interface FeedState {
   order: FeedOrder;
   filter: FeedFilter;
   entries: Entry[];
+  /** New entries discovered by a passive refresh, held back from the list until the
+   *  user opts in via the "N new" pill — keeps the feed from shifting under them. */
+  pendingEntries: Entry[];
   cursor: string | null;
   unreadCount: number;
   loading: boolean;
@@ -36,11 +39,16 @@ interface FeedState {
   setFilter: (filter: FeedFilter) => void;
   loadInitial: () => Promise<void>;
   loadMore: () => Promise<void>;
-  /** Background, scroll-friendly refresh: merges the latest page into the existing
-   *  list in place (no blank-then-refill) so the view never jumps to the top. */
+  /** Background, scroll-friendly refresh: merges updates to existing entries in place
+   *  and stashes genuinely-new ones in `pendingEntries` (no blank-then-refill, no
+   *  content shifting under the reader). */
   refresh: () => Promise<void>;
+  /** Reveals the stashed entries by moving them to the front of the list. */
+  commitPending: () => void;
   markBulkRead: (scope: BulkMarkReadScope) => Promise<number>;
-  summarizeEntry: (id: string) => Promise<EntrySummary | null>;
+  /** Throws an ApiError (see lib/api.ts) with a user-facing message and a `retryable`
+   *  hint if summarization fails — the caller (EntryCard) surfaces it inline. */
+  summarizeEntry: (id: string) => Promise<EntrySummary>;
   toggleRead: (id: string) => Promise<boolean>;
   /** Card calls this on (re)expansion to restore the default auto-mark-on-collapse. */
   clearManualUnread: (id: string) => void;
@@ -71,6 +79,7 @@ export const useFeedStore = create<FeedState>((set, get) => ({
   order: 'desc',
   filter: 'unread',
   entries: [],
+  pendingEntries: [],
   cursor: null,
   unreadCount: 0,
   loading: false,
@@ -90,7 +99,12 @@ export const useFeedStore = create<FeedState>((set, get) => ({
       // pollSource implementations before we ask for entries again.
       await new Promise((r) => setTimeout(r, 4_000));
       const data = await fetchPage(view, order, filter, null);
-      set({ entries: data.entries, cursor: data.nextCursor, unreadCount: data.unreadCount });
+      set({
+        entries: data.entries,
+        pendingEntries: [],
+        cursor: data.nextCursor,
+        unreadCount: data.unreadCount,
+      });
     } catch (err) {
       // User-triggered (Fetch button) → transient toast rather than a sticky banner.
       toast.error(err instanceof Error ? err.message : 'Fetch failed');
@@ -109,17 +123,17 @@ export const useFeedStore = create<FeedState>((set, get) => ({
 
   setViewAndOrder: (view, order) => {
     if (view === get().view && order === get().order) return;
-    set({ view, order, entries: [], cursor: null, unreadCount: 0, error: null });
+    set({ view, order, entries: [], pendingEntries: [], cursor: null, unreadCount: 0, error: null });
   },
 
   setFilter: (filter) => {
     if (filter === get().filter) return;
-    set({ filter, entries: [], cursor: null, error: null });
+    set({ filter, entries: [], pendingEntries: [], cursor: null, error: null });
   },
 
   loadInitial: async () => {
     const { view, order, filter } = get();
-    set({ loading: true, error: null, entries: [], cursor: null });
+    set({ loading: true, error: null, entries: [], pendingEntries: [], cursor: null });
     try {
       const data = await fetchPage(view, order, filter, null);
       set({ entries: data.entries, cursor: data.nextCursor, unreadCount: data.unreadCount });
@@ -149,7 +163,7 @@ export const useFeedStore = create<FeedState>((set, get) => ({
   },
 
   refresh: async () => {
-    const { view, order, filter, entries, loading } = get();
+    const { view, order, filter, entries, pendingEntries, loading } = get();
     // Don't fight an in-flight load/poll; those own the list.
     if (loading || get().polling) return;
     try {
@@ -165,14 +179,29 @@ export const useFeedStore = create<FeedState>((set, get) => ({
         return { ...fresh, isRead: e.isRead, summary: e.summary ?? fresh.summary };
       });
 
-      // Genuinely-new entries (not yet in the list) go at the front, in server order.
-      const existingIds = new Set(entries.map((e) => e.id));
-      const fresh = data.entries.filter((e) => !existingIds.has(e.id));
+      // Genuinely-new entries (not visible, not already stashed) join the pending
+      // pool in server order — the user reveals them via the "N new" pill, so the
+      // list itself never shifts underneath a reader mid-scroll.
+      const visibleIds = new Set(entries.map((e) => e.id));
+      const pendingIds = new Set(pendingEntries.map((e) => e.id));
+      const newlyPending = data.entries.filter(
+        (e) => !visibleIds.has(e.id) && !pendingIds.has(e.id),
+      );
 
-      set({ entries: [...fresh, ...merged], unreadCount: data.unreadCount });
+      set({
+        entries: merged,
+        pendingEntries: newlyPending.length > 0 ? [...newlyPending, ...pendingEntries] : pendingEntries,
+        unreadCount: data.unreadCount,
+      });
     } catch {
       // Background refresh — surface nothing on failure; the next tick retries.
     }
+  },
+
+  commitPending: () => {
+    const { pendingEntries, entries } = get();
+    if (pendingEntries.length === 0) return;
+    set({ entries: [...pendingEntries, ...entries], pendingEntries: [] });
   },
 
   toggleRead: async (id) => {
@@ -231,24 +260,20 @@ export const useFeedStore = create<FeedState>((set, get) => ({
   summarizeEntry: async (id) => {
     const existing = get().entries.find((e) => e.id === id);
     if (existing?.summary) return existing.summary;
-    try {
-      const response = await api<{ summary: EntrySummary; processingState: ProcessingState }>(
-        `/entries/${id}/summarize`,
-        { method: 'POST' },
-      );
-      set({
-        entries: get().entries.map((e) =>
-          e.id === id
-            ? { ...e, summary: response.summary, processingState: response.processingState }
-            : e,
-        ),
-      });
-      return response.summary;
-    } catch {
-      // The EntryCard surfaces this inline in the expanded body (contextual),
-      // so no global banner/toast here.
-      return null;
-    }
+    // Let a failure propagate as-is (an ApiError with message/retryable) — the
+    // EntryCard surfaces it inline in the expanded body, so no global banner here.
+    const response = await api<{ summary: EntrySummary; processingState: ProcessingState }>(
+      `/entries/${id}/summarize`,
+      { method: 'POST' },
+    );
+    set({
+      entries: get().entries.map((e) =>
+        e.id === id
+          ? { ...e, summary: response.summary, processingState: response.processingState }
+          : e,
+      ),
+    });
+    return response.summary;
   },
 
   markBulkRead: async (scope) => {

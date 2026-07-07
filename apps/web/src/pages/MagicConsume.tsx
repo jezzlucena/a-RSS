@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
+import { useThemeStore } from '@/stores/theme';
 
 export default function MagicConsumePage() {
   const consumeMagic = useAuthStore((s) => s.consumeMagic);
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const logoSrc = useThemeStore((s) => s.resolved) === 'dark' ? '/logo_dark.svg' : '/logo.svg';
   const [state, setState] = useState<'pending' | 'error'>('pending');
   const [message, setMessage] = useState<string | null>(null);
 
@@ -28,8 +30,11 @@ export default function MagicConsumePage() {
     <main className="min-h-screen px-6 py-20">
       <div className="mx-auto max-w-md text-center">
         <p className="font-mono text-chip uppercase text-muted">Magic link</p>
-        <h1 className="font-display mt-4 text-6xl font-semibold leading-[0.92] tracking-tight">
-          a<span className="italic text-vermilion">—</span>RSS
+        <h1 className="mt-4 flex items-center justify-center gap-3">
+          <img src={logoSrc} alt="" className="h-12 w-12" />
+          <span className="font-display text-6xl font-semibold leading-[0.92] tracking-tight">
+            a<span className="italic text-vermilion">—</span>RSS
+          </span>
         </h1>
         {state === 'pending' && (
           <p className="font-display mt-8 text-xl italic text-muted">

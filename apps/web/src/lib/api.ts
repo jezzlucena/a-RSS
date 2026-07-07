@@ -40,6 +40,9 @@ export interface ApiError extends Error {
   status: number;
   code?: string;
   details?: unknown;
+  // Whether re-sending the same request might succeed (transient failure) as
+  // opposed to a durable condition that needs something else to change first.
+  retryable: boolean;
 }
 
 function makeApiError(status: number, body: unknown): ApiError {
@@ -49,6 +52,7 @@ function makeApiError(status: number, body: unknown): ApiError {
   err.status = status;
   err.code = code;
   err.details = (body as { details?: unknown })?.details;
+  err.retryable = Boolean((body as { retryable?: boolean })?.retryable);
   return err;
 }
 

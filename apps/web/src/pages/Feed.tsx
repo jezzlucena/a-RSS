@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useFeedStore } from '@/stores/feed';
 import { useSourcesStore } from '@/stores/sources';
 import { timeAgo } from '@/lib/timeAgo';
-import { api } from '@/lib/api';
+import { api, type ApiError } from '@/lib/api';
 import type { Entry, EntryDetail, FeedView } from '@a-rss/shared';
 
 export default function FeedPage() {
@@ -17,6 +17,7 @@ export default function FeedPage() {
   const order = useFeedStore((s) => s.order);
   const filter = useFeedStore((s) => s.filter);
   const entries = useFeedStore((s) => s.entries);
+  const pendingEntries = useFeedStore((s) => s.pendingEntries);
   const cursor = useFeedStore((s) => s.cursor);
   const loading = useFeedStore((s) => s.loading);
   const unreadCount = useFeedStore((s) => s.unreadCount);
@@ -26,6 +27,7 @@ export default function FeedPage() {
   const loadInitial = useFeedStore((s) => s.loadInitial);
   const loadMore = useFeedStore((s) => s.loadMore);
   const refresh = useFeedStore((s) => s.refresh);
+  const commitPending = useFeedStore((s) => s.commitPending);
   const markBulkRead = useFeedStore((s) => s.markBulkRead);
   const toggleRead = useFeedStore((s) => s.toggleRead);
 
@@ -39,6 +41,11 @@ export default function FeedPage() {
   const handleToggleExpand = useCallback((id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
   }, []);
+
+  const handleRevealPending = useCallback(() => {
+    commitPending();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [commitPending]);
 
   // Reset expansion whenever the underlying view/order/filter changes.
   useEffect(() => {
@@ -274,6 +281,19 @@ export default function FeedPage() {
         </p>
       )}
 
+      {pendingEntries.length > 0 && (
+        <div className="sticky top-4 z-20 flex justify-center pointer-events-none">
+          <button
+            type="button"
+            onClick={handleRevealPending}
+            className="pointer-events-auto rounded-full border-2 border-ink bg-ink px-5 py-2 font-mono text-xs uppercase tracking-wide text-paper shadow-lg backdrop-blur-sm transition-colors hover:bg-vermilion-deep focus:bg-vermilion-deep"
+          >
+            <span aria-hidden>↑ </span>
+            {pendingEntries.length} new {pendingEntries.length === 1 ? 'article' : 'articles'}
+          </button>
+        </div>
+      )}
+
       {!loading && entries.length === 0 ? (
         <EmptyState />
       ) : (
@@ -326,7 +346,9 @@ function FetchButton() {
       className="border border-ink px-3 py-2 font-mono text-base leading-none text-ink transition-colors hover:bg-ink hover:text-paper focus:bg-ink focus:text-paper disabled:cursor-progress disabled:opacity-60"
       title="Trigger a poll cycle for this view's sources"
     >
-      <span aria-hidden className={`inline-block ${polling || loading ? 'animate-spin' : ''}`}>↻</span>
+      <span aria-hidden className={`inline-block ${polling || loading ? 'animate-spin' : ''}`}>
+        <span aria-hidden className="inline-block -translate-y-[2px]">↻</span>
+      </span>
     </button>
   );
 }
@@ -345,7 +367,9 @@ function EntryCard({
   const toggleRead = useFeedStore((s) => s.toggleRead);
   const retryEntry = useFeedStore((s) => s.retryEntry);
   const [summarizing, setSummarizing] = useState(false);
-  const [summarizeError, setSummarizeError] = useState<string | null>(null);
+  const [summarizeError, setSummarizeError] = useState<{ message: string; retryable: boolean } | null>(
+    null,
+  );
   // Fallback article body: when summarize fails or there's nothing to summarize,
   // fetch the full extracted text from /entries/:id and render it inline.
   const [fallbackText, setFallbackText] = useState<string | null>(null);
@@ -361,6 +385,20 @@ function EntryCard({
   const intro = entry.summary?.intro ?? null;
   const bullets = entry.summary?.bullets;
   const canExpand = entry.processingState !== 'failed';
+
+  const runSummarize = useCallback(() => {
+    setSummarizing(true);
+    setSummarizeError(null);
+    summarizeEntry(entry.id)
+      .catch((err: unknown) => {
+        const apiErr = err as Partial<ApiError>;
+        setSummarizeError({
+          message: apiErr.message || 'Could not summarize this article.',
+          retryable: apiErr.retryable ?? true,
+        });
+      })
+      .finally(() => setSummarizing(false));
+  }, [entry.id, summarizeEntry]);
 
   // React to expansion. On expand: scroll into view, restore default
   // auto-mark-on-collapse behavior, kick off summarization. On collapse (the cleanup):
@@ -379,15 +417,7 @@ function EntryCard({
 
     cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (!entry.summary && entry.processingState === 'fetched') {
-      setSummarizing(true);
-      summarizeEntry(entry.id)
-        .then((res) => {
-          if (!res) setSummarizeError('Could not summarize this article.');
-        })
-        .catch((err) =>
-          setSummarizeError(err instanceof Error ? err.message : 'Could not summarize.'),
-        )
-        .finally(() => setSummarizing(false));
+      runSummarize();
     }
     return () => {
       // Runs when isExpanded transitions true → false, or on unmount while expanded.
@@ -423,12 +453,22 @@ function EntryCard({
         setFallbackText('');
       })
       .finally(() => {
-        if (!cancelled) setLoadingFallback(false);
+        // Reset even if cancelled — this request only ever gets cancelled by the very
+        // next run of this effect (the isExpanded and summarize effects don't clean
+        // this one up), so leaving loadingFallback stuck true would permanently trip
+        // the `fallbackText !== null || loadingFallback` guard above and the fetch
+        // would never be retried once summarizing settles.
+        setLoadingFallback(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [isExpanded, entry.summary, summarizing, entry.processingState, fallbackText, loadingFallback, entry.id]);
+    // loadingFallback is deliberately excluded: it's set by this very effect, so
+    // including it would let the effect's own true→false transition retrigger itself
+    // — a livelock where each fetch gets cancelled by its own successor before it can
+    // ever set fallbackText, forever reopening the `fallbackText !== null` guard below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isExpanded, entry.summary, summarizing, entry.processingState, fallbackText, entry.id]);
 
   return (
     <li
@@ -551,7 +591,17 @@ function EntryCard({
 
           {summarizeError && !summarizing && (
             <p className="mt-5 font-mono text-chip uppercase text-vermilion-deep">
-              {summarizeError}
+              {summarizeError.message}
+              {summarizeError.retryable && (
+                <button
+                  type="button"
+                  onClick={runSummarize}
+                  className="ml-3 inline-flex items-center gap-1 text-vermilion-deep underline underline-offset-[3px] hover:no-underline hover:text-vermilion focus:no-underline focus:text-vermilion"
+                  title="Try summarizing again"
+                >
+                  <span aria-hidden>↻</span> Try again
+                </button>
+              )}
             </p>
           )}
 

@@ -1,6 +1,76 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import type { SummarizeErrorCode } from '@a-rss/shared';
 import { env } from '../config/env.js';
+
+// Carries a user-safe message and a retryable hint alongside the machine code, so
+// callers (the entries controller) can translate it into an HttpError without having
+// to re-inspect the underlying Anthropic SDK error type.
+export class SummarizeError extends Error {
+  constructor(public code: SummarizeErrorCode, message: string, public retryable: boolean) {
+    super(message);
+  }
+}
+
+function classifySummarizeError(err: unknown): SummarizeError {
+  if (err instanceof Anthropic.RateLimitError) {
+    return new SummarizeError(
+      'rate_limited',
+      'Claude is handling too many requests right now. Wait a moment and try again.',
+      true,
+    );
+  }
+  if (err instanceof Anthropic.APIConnectionTimeoutError) {
+    return new SummarizeError('timeout', 'The request to Claude timed out. Try again.', true);
+  }
+  if (err instanceof Anthropic.APIConnectionError) {
+    return new SummarizeError(
+      'connection_error',
+      'Could not reach Claude. Check your connection and try again.',
+      true,
+    );
+  }
+  if (err instanceof Anthropic.AuthenticationError) {
+    return new SummarizeError(
+      'invalid_api_key',
+      'Your Anthropic API key was rejected. Check it in Settings.',
+      false,
+    );
+  }
+  if (err instanceof Anthropic.PermissionDeniedError) {
+    return new SummarizeError(
+      'permission_denied',
+      "Your Anthropic API key doesn't have access to this model.",
+      false,
+    );
+  }
+  if (err instanceof Anthropic.BadRequestError) {
+    return new SummarizeError(
+      'bad_request',
+      'Claude rejected this article — it may be malformed or unusually long.',
+      false,
+    );
+  }
+  if (err instanceof Anthropic.APIError && (err.status ?? 0) >= 500) {
+    return new SummarizeError(
+      'model_overloaded',
+      'Claude is temporarily unavailable. Try again shortly.',
+      true,
+    );
+  }
+  if (err instanceof Error && /not valid JSON|Expected/.test(err.message)) {
+    return new SummarizeError(
+      'invalid_response',
+      'Claude returned an unexpected response. Try again.',
+      true,
+    );
+  }
+  return new SummarizeError(
+    'unknown',
+    'Something went wrong asking Claude to summarize this article. Try again.',
+    true,
+  );
+}
 
 // Long, stable system prompt: voice rules + many worked examples.
 // Stable across all entries → benefits from prompt caching (cache_control below).
@@ -166,12 +236,14 @@ export async function summarize(input: SummarizeInput): Promise<SummarizeResult>
     return await callOnce(input);
   } catch (err) {
     // One retry — handles transient parse failures or rate-limit blips.
-    if (err instanceof Anthropic.APIError && (err.status ?? 0) >= 500) {
+    const shouldRetryOnce =
+      (err instanceof Anthropic.APIError && (err.status ?? 0) >= 500) ||
+      (err instanceof Error && /not valid JSON|Expected/.test(err.message));
+    if (!shouldRetryOnce) throw classifySummarizeError(err);
+    try {
       return await callOnce(input);
+    } catch (retryErr) {
+      throw classifySummarizeError(retryErr);
     }
-    if (err instanceof Error && /not valid JSON|Expected/.test(err.message)) {
-      return await callOnce(input);
-    }
-    throw err;
   }
 }

@@ -4,9 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#F4F1EA" />
+    <link id="favicon-ico" rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link id="favicon-svg" rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <link id="apple-touch-icon" rel="apple-touch-icon" href="/logo.png" />
     <title>a-RSS</title>
     <!-- Apply the saved theme before paint to avoid a light/dark flash, and set the
-         mobile browser chrome color (theme-color) to match the app background. -->
+         mobile browser chrome color (theme-color) and favicon to match. Kept in sync
+         with stores/theme.ts's `apply()`, which handles the same swap after boot
+         (e.g. when the user toggles theme from the navbar). -->
     <script>
       (function () {
         try {
@@ -18,6 +23,14 @@
           if (dark) document.documentElement.classList.add('dark');
           var meta = document.querySelector('meta[name="theme-color"]');
           if (meta) meta.setAttribute('content', dark ? '#171510' : '#F4F1EA');
+          if (dark) {
+            var ico = document.getElementById('favicon-ico');
+            var svg = document.getElementById('favicon-svg');
+            var touch = document.getElementById('apple-touch-icon');
+            if (ico) ico.setAttribute('href', '/favicon_dark.ico');
+            if (svg) svg.setAttribute('href', '/logo_dark.svg');
+            if (touch) touch.setAttribute('href', '/logo_dark.png');
+          }
         } catch (e) {}
       })();
     </script>

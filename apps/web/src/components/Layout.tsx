@@ -34,6 +34,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const logoSrc = useThemeStore((s) => s.resolved) === 'dark' ? '/logo_dark.svg' : '/logo.svg';
 
   // Clicking a sidebar feed link that points to the route you're already on is a
   // no-op for the router, so re-fetch the feed explicitly — that's the reload.
@@ -138,8 +139,9 @@ export function Layout({ children }: { children: ReactNode }) {
                 setSidebarOpen(true);
               }
             }}
-            className="group flex items-baseline gap-1"
+            className="group flex items-center"
           >
+            <img src={logoSrc} alt="" className="h-7 w-7 mr-2" />
             <span className="font-display text-2xl font-semibold leading-none tracking-tight">
               a<span className="italic text-vermilion">—</span>RSS
             </span>
@@ -189,9 +191,10 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="mb-6 flex items-center">
           <NavLink
             to="/feed/all"
-            className="font-display text-2xl font-semibold tracking-tight"
+            className="flex items-center font-display text-2xl font-semibold tracking-tight"
             onClick={(e) => reloadIfActive(e, '/feed/all')}
           >
+            <img src={logoSrc} alt="" className="h-7 w-7 mr-2" />
             a<span className="italic text-vermilion">—</span>RSS
           </NavLink>
         </div>

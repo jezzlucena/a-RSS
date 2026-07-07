@@ -9,7 +9,7 @@ import { getUserId } from '../middleware/auth.js';
 import { HttpError } from '../middleware/errors.js';
 import { processEntryNow } from '../services/agendaService.js';
 import { extractArticle } from '../services/articleExtractor.js';
-import { summarize } from '../services/summarizer.js';
+import { summarize, SummarizeError } from '../services/summarizer.js';
 import { decryptSecret } from '../services/userSecrets.js';
 import { serializeEntry } from '../services/serializers.js';
 import type { EntryDetail, EntrySummary } from '@a-rss/shared';
@@ -122,18 +122,28 @@ export const summarizeEntry: RequestHandler = async (req, res) => {
   }
 
   if (entry.processingState === 'pending') {
-    throw new HttpError(409, 'not_ready', "Article hasn't been fetched yet — try again shortly");
+    throw new HttpError(409, 'not_ready', "Article hasn't been fetched yet — try again shortly", true);
   }
   if (entry.processingState === 'failed') {
-    throw new HttpError(409, 'fetch_failed', 'The article could not be fetched');
+    throw new HttpError(
+      409,
+      'fetch_failed',
+      'The article could not be fetched — use Retry on the article to re-fetch it first',
+      false,
+    );
   }
   if (!entry.rawHtml) {
-    throw new HttpError(409, 'no_article_body', 'No article body available to summarize');
+    throw new HttpError(409, 'no_article_body', 'No article body available to summarize', false);
   }
 
   const article = extractArticle(entry.rawHtml, entry.url);
   if (!article.textContent || article.textContent.length < 200) {
-    throw new HttpError(422, 'article_too_short', 'Extracted article body is too short to summarize');
+    throw new HttpError(
+      422,
+      'article_too_short',
+      'Extracted article body is too short to summarize',
+      false,
+    );
   }
 
   const user = await User.findById(userId).select('anthropicApiKeyEnc');
@@ -142,17 +152,27 @@ export const summarizeEntry: RequestHandler = async (req, res) => {
       412,
       'anthropic_api_key_missing',
       'Set your Anthropic API key in Settings to summarize articles',
+      false,
     );
   }
   const apiKey = decryptSecret(user.anthropicApiKeyEnc);
 
-  const result = await summarize({
-    title: entry.title,
-    byline: article.byline,
-    publishedAt: entry.publishedAt,
-    articleText: article.textContent,
-    apiKey,
-  });
+  let result;
+  try {
+    result = await summarize({
+      title: entry.title,
+      byline: article.byline,
+      publishedAt: entry.publishedAt,
+      articleText: article.textContent,
+      apiKey,
+    });
+  } catch (err) {
+    if (err instanceof SummarizeError) {
+      // 503 for transient upstream trouble, 422 when the request itself can't succeed.
+      throw new HttpError(err.retryable ? 503 : 422, err.code, err.message, err.retryable);
+    }
+    throw err;
+  }
 
   entry.summary = {
     intro: result.intro,

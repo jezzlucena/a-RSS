@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
+import { useThemeStore } from '@/stores/theme';
 import { GoogleButton } from '@/components/GoogleButton';
 
 export default function LoginPage() {
@@ -8,6 +9,7 @@ export default function LoginPage() {
   const requestMagic = useAuthStore((s) => s.requestMagic);
   const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle);
   const navigate = useNavigate();
+  const logoSrc = useThemeStore((s) => s.resolved) === 'dark' ? '/logo_dark.svg' : '/logo.svg';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -64,8 +66,11 @@ export default function LoginPage() {
           <p className="font-mono text-chip uppercase text-muted">
             Issue No. 001 · {new Date().getFullYear()}
           </p>
-          <h1 className="font-display mt-6 text-7xl font-semibold leading-[0.92] tracking-tight">
-            a<span className="font-display italic text-vermilion">—</span>RSS
+          <h1 className="mt-6 flex items-center gap-4">
+            <img src={logoSrc} alt="" className="h-16 w-16" />
+            <span className="font-display text-7xl font-semibold leading-[0.92] tracking-tight">
+              a<span className="font-display italic text-vermilion">—</span>RSS
+            </span>
           </h1>
           <p className="mt-6 max-w-sm text-balance text-base leading-relaxed text-muted">
             Another RSS Software Solution.{' '}

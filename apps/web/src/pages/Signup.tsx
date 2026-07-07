@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
+import { useThemeStore } from '@/stores/theme';
 
 export default function SignupPage() {
   const signup = useAuthStore((s) => s.signup);
   const navigate = useNavigate();
+  const logoSrc = useThemeStore((s) => s.resolved) === 'dark' ? '/logo_dark.svg' : '/logo.svg';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -32,8 +34,11 @@ export default function SignupPage() {
     <main className="min-h-screen px-6 py-12 sm:py-20">
       <div className="mx-auto max-w-md">
         <p className="font-mono text-chip uppercase text-muted">Open an account</p>
-        <h1 className="font-display mt-4 text-5xl font-semibold leading-[0.95] tracking-tight">
-          a<span className="italic text-vermilion">—</span>RSS
+        <h1 className="mt-4 flex items-center gap-3">
+          <img src={logoSrc} alt="" className="h-11 w-11" />
+          <span className="font-display text-5xl font-semibold leading-[0.95] tracking-tight">
+            a<span className="italic text-vermilion">—</span>RSS
+          </span>
         </h1>
         <p className="mt-3 max-w-sm text-sm text-muted">
           Create your account.{' '}
