@@ -18,6 +18,16 @@ function absoluteUrl(maybeRelative: string, baseUrl: string): string | null {
   }
 }
 
+// Readability's textContent commonly includes lines that are empty or whitespace-only
+// (blank paragraph separators, leftover indentation from the source markup) — drop them
+// so downstream readers (the article view, the summarizer prompt) see only real content.
+function stripBlankLines(text: string): string {
+  return text
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+    .join('\n');
+}
+
 function pickImage(doc: Document, baseUrl: string): string | null {
   const ogImage = doc.querySelector('meta[property="og:image"]')?.getAttribute('content');
   if (ogImage) return absoluteUrl(ogImage, baseUrl);
@@ -41,7 +51,7 @@ export function extractArticle(html: string, baseUrl: string): ExtractedArticle 
   }
   return {
     title: parsed.title ?? '',
-    textContent: parsed.textContent?.trim() ?? '',
+    textContent: stripBlankLines(parsed.textContent?.trim() ?? ''),
     excerpt: parsed.excerpt ?? '',
     byline: parsed.byline ?? null,
     length: parsed.length ?? (parsed.textContent?.trim().length ?? 0),

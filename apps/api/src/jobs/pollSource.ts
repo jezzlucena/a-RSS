@@ -1,4 +1,5 @@
 import RssParser from 'rss-parser';
+import { decodeHTML } from 'entities';
 import { Source } from '../models/source.js';
 import { Entry } from '../models/entry.js';
 
@@ -71,6 +72,10 @@ export async function pollSource(
   for (const item of feed.items) {
     const guid = item.guid ?? item.id ?? item.link;
     if (!guid || !item.link || !item.title) continue;
+    // rss-parser's XML decode leaves double-escaped titles (e.g. a CMS that already
+    // HTML-escaped, then a feed generator that escaped again) as literal entity text
+    // like "&amp;#8217;" — decode once more so the title stores the real glyph.
+    const title = decodeHTML(item.title).slice(0, 500);
     const publishedAt = item.isoDate
       ? new Date(item.isoDate)
       : item.pubDate
@@ -85,7 +90,7 @@ export async function pollSource(
     const feedHtmlSource =
       feedItem['content:encoded'] ?? feedItem.content ?? feedItem.summary ?? null;
     const rawHtml = feedHtmlSource
-      ? `<!doctype html><html><head><title>${escapeHtml(item.title)}</title></head><body><article>${feedHtmlSource}</article></body></html>`.slice(
+      ? `<!doctype html><html><head><title>${escapeHtml(title)}</title></head><body><article>${feedHtmlSource}</article></body></html>`.slice(
           0,
           200_000,
         )
@@ -99,7 +104,7 @@ export async function pollSource(
           sourceId: source._id,
           guid,
           url: item.link,
-          title: item.title.slice(0, 500),
+          title,
           publishedAt,
           description,
           rawHtml,

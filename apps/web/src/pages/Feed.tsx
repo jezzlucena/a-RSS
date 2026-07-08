@@ -200,7 +200,9 @@ export default function FeedPage() {
               className="border border-ink px-3 pr-5 py-2 font-mono text-base text-xs leading-4 text-ink transition-colors hover:bg-ink hover:text-paper focus:bg-ink focus:text-paper"
               title={order === 'desc' ? 'Newest first (click for oldest)' : 'Oldest first (click for newest)'}
             >
-              <span aria-hidden>↑ {order === 'desc' ? 'New' : 'Old'}</span>
+              <span aria-hidden>
+                <span aria-hidden className="inline-block scale-[1.5]">↑</span> {order === 'desc' ? 'New' : 'Old'}
+              </span>
             </button>
             <div className="relative">
               <button
@@ -209,7 +211,7 @@ export default function FeedPage() {
                 aria-expanded={menuOpen}
                 className="appearance-none border border-ink bg-paper px-3 pr-7 font-mono text-base leading-[32px] transition-colors hover:bg-vermilion-deep focus:bg-vermilion-deep"
               >
-                ✔
+                <span aria-hidden className="inline-block scale-[1.5]">✔</span>
                 <span aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-[65%] font-mono text-lg text-ink">
                   ⌄
                 </span>
@@ -347,7 +349,7 @@ function FetchButton() {
       title="Trigger a poll cycle for this view's sources"
     >
       <span aria-hidden className={`inline-block ${polling || loading ? 'animate-spin' : ''}`}>
-        <span aria-hidden className="inline-block -translate-y-[2px]">↻</span>
+        <span aria-hidden className="inline-block transform scale-150 -translate-y-[1.5px]">↻</span>
       </span>
     </button>
   );
