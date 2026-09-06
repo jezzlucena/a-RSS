@@ -1,4 +1,5 @@
-// Copy to ios/Local.xcconfig (gitignored) and fill in what you need. Every key is optional.
+// Copy to ios/Local.xcconfig (gitignored) and fill in what you need. Every key is optional;
+// Defaults.xcconfig includes this file last, so anything set here wins.
 // Google sign-in: both values come from the iOS OAuth client in Google Cloud Console.
 // GOOGLE_CLIENT_ID = 1234567890-abc.apps.googleusercontent.com
 // GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.1234567890-abc

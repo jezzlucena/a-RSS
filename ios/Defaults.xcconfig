@@ -1,0 +1,15 @@
+// Build-time configuration defaults. Checked in. Anything here can be overridden per developer
+// in the gitignored Local.xcconfig (see Local.xcconfig.example), which is included last.
+// `$()` keeps xcconfig from reading `//` in URLs as a comment.
+
+// Production API; the Docker dev stack is http://localhost:5088/api/v1.
+ARSS_API_BASE_URL = https:/$()/api.a-rss.com/api/v1
+
+// Google Sign-In (empty = button hidden). Both come from the iOS OAuth client in Google Cloud.
+GOOGLE_CLIENT_ID =
+GOOGLE_REVERSED_CLIENT_ID =
+
+// Signing for device builds.
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"

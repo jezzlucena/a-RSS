@@ -61,7 +61,9 @@ failure it prints field errors and exits). Required with no default: `MONGO_URL`
 `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` (16+ chars), `USER_SECRETS_KEY` (32+ chars;
 AES-256-GCM key for per-user LLM API keys — rotating it invalidates every stored
 key). Optional: `SMTP_URL` (without it, magic links are printed to stdout),
-`GOOGLE_OAUTH_CLIENT_ID`/`VITE_GOOGLE_CLIENT_ID` (must match), `APPLE_CLIENT_ID`, S3 creds.
+`GOOGLE_OAUTH_CLIENT_ID` (comma-separated allowlist of the web and iOS client ids — Google
+tokens carry the audience of the client that requested them), `VITE_GOOGLE_CLIENT_ID` (the
+web one), `APPLE_CLIENT_ID`, S3 creds.
 
 **There is no server-wide LLM API key.** Each account picks a provider in Settings
 (Anthropic, OpenAI, Gemini, DeepSeek, Qwen, Kimi, or any OpenAI-compatible endpoint) and
@@ -313,10 +315,12 @@ TEST_RUNNER_SMOKE_EMAIL=… TEST_RUNNER_SMOKE_PASSWORD=… xcodebuild … -only-
   that one cookie into the Keychain after every auth response because the server rotates it
   on each refresh and the cookie store flushes lazily — an abrupt kill right after a refresh
   otherwise loses the session. Nothing else belongs in the Keychain.
-- **Config**: `ARSS_API_BASE_URL` (default `https://api.a-rss.com/api/v1`; set
-  `http://localhost:5088/api/v1` in `Local.xcconfig` for the Docker stack),
-  `GOOGLE_CLIENT_ID` / `GOOGLE_REVERSED_CLIENT_ID` and `DEVELOPMENT_TEAM` come from the
-  gitignored `ios/Local.xcconfig` (see `Local.xcconfig.example`). The Google button hides
+- **Config**: `ARSS_API_BASE_URL` (default `https://api.a-rss.com/api/v1`),
+  `GOOGLE_CLIENT_ID` / `GOOGLE_REVERSED_CLIENT_ID` and `DEVELOPMENT_TEAM` live in
+  `ios/Defaults.xcconfig` (checked in), which `#include?`s the gitignored `ios/Local.xcconfig`
+  last — put per-developer values there (e.g. `http://localhost:5088/api/v1` for the Docker
+  stack; see `Local.xcconfig.example`). Never define these under `settings:` in project.yml:
+  Xcode's project/target settings override xcconfig values, which silently disables overrides. The Google button hides
   itself when the id is empty. Magic links arrive as `arss://auth/magic?t=…` or a pasted web link.
 - **Liquid Glass is used sparingly**: system toolbars/tab bar, the "N new" pill, toasts, and
   primary CTAs. Cards and rows are opaque paper surfaces on purpose.

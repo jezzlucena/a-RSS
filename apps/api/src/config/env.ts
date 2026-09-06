@@ -15,6 +15,7 @@ const envSchema = z.object({
   SMTP_URL: z.string().optional(),
   MAIL_FROM: z.string().default('a-RSS <noreply@a-rss.app>'),
 
+  /** Comma-separated allowlist: the web client id and the iOS client id (see googleAuth.ts). */
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
   APPLE_CLIENT_ID: z.string().optional(),
 
