@@ -6,7 +6,12 @@
     <meta name="theme-color" content="#F4F1EA" />
     <link id="favicon-ico" rel="icon" href="/favicon.ico" sizes="32x32" />
     <link id="favicon-svg" rel="icon" type="image/svg+xml" href="/logo.svg" />
-    <link id="apple-touch-icon" rel="apple-touch-icon" href="/logo.png" />
+    <!-- iOS Safari home-screen/bookmark icon. Must be an opaque, square-cornered PNG:
+         iOS applies its own corner mask and renders transparency as black. Served at
+         the conventional root path too, since Safari requests /apple-touch-icon.png
+         directly when it ignores the <link>. Deliberately not theme-swapped — the icon
+         is captured once when the bookmark is made. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <title>a-RSS</title>
     <!-- Apply the saved theme before paint to avoid a light/dark flash, and set the
          mobile browser chrome color (theme-color) and favicon to match. Kept in sync
@@ -26,10 +31,8 @@
           if (dark) {
             var ico = document.getElementById('favicon-ico');
             var svg = document.getElementById('favicon-svg');
-            var touch = document.getElementById('apple-touch-icon');
             if (ico) ico.setAttribute('href', '/favicon_dark.ico');
             if (svg) svg.setAttribute('href', '/logo_dark.svg');
-            if (touch) touch.setAttribute('href', '/logo_dark.png');
           }
         } catch (e) {}
       })();

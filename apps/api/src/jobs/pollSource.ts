@@ -2,8 +2,28 @@ import RssParser from 'rss-parser';
 import { decodeHTML } from 'entities';
 import { Source } from '../models/source.js';
 import { Entry } from '../models/entry.js';
+import { pickFeedImage, type MediaRssNode } from '../services/feedImage.js';
 
-const parser = new RssParser({ timeout: 15_000 });
+// Fields rss-parser doesn't surface by default. `content:encoded` is the full-body
+// convention many feeds use; the two Media RSS tags are where feeds put their hero
+// image (keepArray: an item can carry several, e.g. one per size).
+interface FeedItemExtras {
+  /** Atom entries identify themselves with <id>, not <guid>. */
+  id?: string;
+  'content:encoded'?: string;
+  mediaContent?: MediaRssNode[];
+  mediaThumbnail?: MediaRssNode[];
+}
+
+const parser = new RssParser<Record<string, unknown>, FeedItemExtras>({
+  timeout: 15_000,
+  customFields: {
+    item: [
+      ['media:content', 'mediaContent', { keepArray: true }],
+      ['media:thumbnail', 'mediaThumbnail', { keepArray: true }],
+    ],
+  },
+});
 
 export const MIN_INTERVAL_MS = 5 * 60_000;
 export const MAX_INTERVAL_MS = 60 * 60_000;
@@ -86,15 +106,17 @@ export async function pollSource(
     // Capture the feed-provided HTML body so processEntry has a fallback if every
     // paywall-bypass strategy fails. rss-parser surfaces full content via `content` or
     // `content:encoded` (depending on feed shape); fall back to summary.
-    const feedItem = item as typeof item & { 'content:encoded'?: string };
-    const feedHtmlSource =
-      feedItem['content:encoded'] ?? feedItem.content ?? feedItem.summary ?? null;
+    const feedHtmlSource = item['content:encoded'] ?? item.content ?? item.summary ?? null;
     const rawHtml = feedHtmlSource
       ? `<!doctype html><html><head><title>${escapeHtml(title)}</title></head><body><article>${feedHtmlSource}</article></body></html>`.slice(
           0,
           200_000,
         )
       : null;
+    // Whatever illustration the feed itself carries, so the card has an image from the
+    // moment it appears rather than after the bypass chain reaches the article page.
+    // processEntry upgrades it to the page's og:image when there is one.
+    const feedImage = pickFeedImage(item, feedHtmlSource);
 
     const result = await Entry.updateOne(
       { sourceId: source._id, guid },
@@ -108,6 +130,7 @@ export async function pollSource(
           publishedAt,
           description,
           rawHtml,
+          image: feedImage,
           processingState: 'pending',
         },
       },
@@ -116,7 +139,16 @@ export async function pollSource(
     if (result.upsertedCount && result.upsertedCount > 0) {
       inserted++;
       if (result.upsertedId) insertedIds.push(String(result.upsertedId));
-    } else if (rawHtml) {
+      continue;
+    }
+
+    if (feedImage) {
+      // Existing entries with no illustration (the page had no og:image, or the entry
+      // predates feed-image capture) adopt the feed's. Point lookup on the unique
+      // {sourceId, guid} index; a no-op once `image` is set.
+      await Entry.updateOne({ sourceId: source._id, guid, image: null }, { $set: { image: feedImage } });
+    }
+    if (rawHtml) {
       // Backfill rawHtml on existing entries that lack it (predate the feed-fallback
       // logic). If the entry was previously `failed`, transition it back to `pending`
       // and re-enqueue so processEntry can use the freshly-backfilled feed content.

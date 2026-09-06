@@ -22,11 +22,12 @@ function resolve(pref: ThemePreference): Resolved {
 }
 
 // Matches the ids on the <link> boot tags in index.html and the light/dark asset
-// pairs in public/ (logo.svg/logo_dark.svg, favicon.ico/favicon_dark.ico, etc).
-const FAVICON: Record<'favicon-ico' | 'favicon-svg' | 'apple-touch-icon', Record<Resolved, string>> = {
+// pairs in public/ (logo.svg/logo_dark.svg, favicon.ico/favicon_dark.ico). The
+// apple-touch-icon is intentionally not swapped: iOS captures it once when a bookmark
+// is created, so it's a single fixed asset (public/apple-touch-icon.png).
+const FAVICON: Record<'favicon-ico' | 'favicon-svg', Record<Resolved, string>> = {
   'favicon-ico': { light: '/favicon.ico', dark: '/favicon_dark.ico' },
   'favicon-svg': { light: '/logo.svg', dark: '/logo_dark.svg' },
-  'apple-touch-icon': { light: '/logo.png', dark: '/logo_dark.png' },
 };
 
 function apply(resolved: Resolved): void {

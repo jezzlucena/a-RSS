@@ -100,6 +100,18 @@ function pickExtension(contentType: string): string {
   return cleaned.toLowerCase();
 }
 
+/** True when `url` already points into our bucket, i.e. was produced by `cacheImage`. */
+export function isCachedImageUrl(url: string): boolean {
+  const prefix = buildPublicUrl({
+    endpoint: env.S3_ENDPOINT,
+    region: env.S3_REGION,
+    bucket: env.S3_BUCKET,
+    forcePathStyle: env.S3_FORCE_PATH_STYLE,
+    key: 'entries/',
+  });
+  return url.startsWith(prefix);
+}
+
 /** Downloads `sourceUrl`, uploads to S3/MinIO, returns the public URL. */
 export async function cacheImage(sourceUrl: string, entryId: string): Promise<string> {
   await ensureBucketReady();

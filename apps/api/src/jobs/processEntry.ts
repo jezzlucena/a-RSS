@@ -1,7 +1,7 @@
 import { Entry } from '../models/entry.js';
 import { Source } from '../models/source.js';
 import { fetchArticle, FetcherError } from '../services/fetcher.js';
-import { cacheImage } from '../services/imageStore.js';
+import { cacheImage, isCachedImageUrl } from '../services/imageStore.js';
 import { extractArticle } from '../services/articleExtractor.js';
 import { logger } from '../services/logger.js';
 
@@ -12,9 +12,25 @@ const MIN_ARTICLE_LENGTH = 500;
 // keep the entry in `failed`.)
 const FEED_FALLBACK_MIN_TEXT = 200;
 
+// Copies a remote image into our S3/MinIO bucket and returns its URL. Failures are
+// non-fatal: the card hotlinks the original instead. Already-cached URLs pass through
+// so a retried entry doesn't re-upload the same bytes under a new key.
+async function cacheOrKeep(sourceUrl: string, entryId: string): Promise<string> {
+  if (isCachedImageUrl(sourceUrl)) return sourceUrl;
+  try {
+    return await cacheImage(sourceUrl, entryId);
+  } catch (err) {
+    logger.debug(
+      { entryId, err: (err as Error).message, sourceUrl },
+      'image-cache: falling back to source URL',
+    );
+    return sourceUrl;
+  }
+}
+
 /**
- * Background pipeline: fetch the article via the paywall-bypass chain, cache its
- * og:image, store rawHtml. Summarization is deferred — we only call Claude when
+ * Background pipeline: fetch the article via the paywall-bypass chain, settle the
+ * illustration, store rawHtml. Summarization is deferred — we only call Claude when
  * a user actually expands the card (`POST /entries/:id/summarize`). This keeps
  * Anthropic spend bounded by reader interest rather than firehose volume.
  *
@@ -49,17 +65,13 @@ export async function processEntry(entryId: string): Promise<void> {
     });
 
     entry.rawHtml = fetched.fetch.html.slice(0, 200_000); // bound storage
+    // The page's og:image is the editorially chosen hero, so it replaces the `inline`
+    // image pollSource lifted from the feed body. When the page has none, the feed's
+    // image stays rather than being dropped. Either way the winner gets cached.
     if (fetched.article.imageUrl) {
-      let imageUrl = fetched.article.imageUrl;
-      try {
-        imageUrl = await cacheImage(fetched.article.imageUrl, entry.id);
-      } catch (err) {
-        logger.debug(
-          { entryId: entry.id, err: (err as Error).message, sourceUrl: fetched.article.imageUrl },
-          'image-cache: falling back to source URL',
-        );
-      }
-      entry.image = { url: imageUrl, source: 'og' };
+      entry.image = { url: await cacheOrKeep(fetched.article.imageUrl, entry.id), source: 'og' };
+    } else if (entry.image?.source === 'inline') {
+      entry.image = { url: await cacheOrKeep(entry.image.url, entry.id), source: 'inline' };
     }
     entry.processingState = 'fetched';
     entry.error = null;
@@ -80,7 +92,8 @@ export async function processEntry(entryId: string): Promise<void> {
         const article = extractArticle(entry.rawHtml, entry.url);
         if (article.textContent && article.textContent.length >= FEED_FALLBACK_MIN_TEXT) {
           if (!entry.image && article.imageUrl) {
-            entry.image = { url: article.imageUrl, source: 'og' };
+            // Lifted from feed HTML, not the article page, so it's `inline` too.
+            entry.image = { url: article.imageUrl, source: 'inline' };
           }
           entry.processingState = 'fetched';
           entry.error = `feed_fallback: ${attemptSummary}`.slice(0, 500);
