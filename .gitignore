@@ -17,3 +17,5 @@ ios/**/DerivedData/
 ios/**/*.xcuserstate
 ios/**/xcuserdata/
 ios/**/.swiftpm/
+ios/aRSS/Info.plist
+ios/Local.xcconfig

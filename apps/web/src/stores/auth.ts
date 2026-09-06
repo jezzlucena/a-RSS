@@ -1,5 +1,11 @@
 import { create } from 'zustand';
-import type { MeResponse, AuthTokensResponse } from '@a-rss/shared';
+import type {
+  MeResponse,
+  AuthTokensResponse,
+  LlmProviderId,
+  LlmProviderState,
+  UpsertLlmCredentialRequest,
+} from '@a-rss/shared';
 import { api, setAccessToken, tryRestoreSession } from '@/lib/api';
 
 interface AuthState {
@@ -12,9 +18,18 @@ interface AuthState {
   consumeMagic: (token: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
   changePassword: (newPassword: string, currentPassword?: string) => Promise<void>;
-  setAnthropicApiKey: (apiKey: string) => Promise<void>;
-  clearAnthropicApiKey: () => Promise<void>;
+  /** Make `provider` the account's summarization provider (configured or not). */
+  selectLlmProvider: (provider: LlmProviderId) => Promise<void>;
+  /** Partial upsert of one provider's key / model / base URL. */
+  saveLlmCredential: (provider: LlmProviderId, body: UpsertLlmCredentialRequest) => Promise<void>;
+  removeLlmCredential: (provider: LlmProviderId) => Promise<void>;
   logout: () => Promise<void>;
+}
+
+/** The provider the account currently summarizes with, as reported by /me. */
+export function activeLlmProvider(me: MeResponse | null): LlmProviderState | null {
+  if (!me) return null;
+  return me.llm.providers.find((p) => p.id === me.llm.provider) ?? null;
 }
 
 async function fetchMeAndStore(set: (partial: Partial<AuthState>) => void): Promise<void> {
@@ -97,13 +112,18 @@ export const useAuthStore = create<AuthState>((set) => ({
     await fetchMeAndStore(set);
   },
 
-  setAnthropicApiKey: async (apiKey) => {
-    await api('/me/anthropic-api-key', { method: 'PUT', body: { apiKey } });
+  selectLlmProvider: async (provider) => {
+    await api('/me/llm', { method: 'PUT', body: { provider } });
     await fetchMeAndStore(set);
   },
 
-  clearAnthropicApiKey: async () => {
-    await api('/me/anthropic-api-key', { method: 'DELETE' });
+  saveLlmCredential: async (provider, body) => {
+    await api(`/me/llm/${provider}`, { method: 'PUT', body });
+    await fetchMeAndStore(set);
+  },
+
+  removeLlmCredential: async (provider) => {
+    await api(`/me/llm/${provider}`, { method: 'DELETE' });
     await fetchMeAndStore(set);
   },
 

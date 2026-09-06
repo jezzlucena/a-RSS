@@ -18,11 +18,12 @@ const envSchema = z.object({
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
   APPLE_CLIENT_ID: z.string().optional(),
 
-  SUMMARIZER_MODEL: z.string().default('claude-haiku-4-5-20251001'),
+  /** Default Anthropic model. Other providers' defaults live in the shared LLM catalog;
+   *  users may override the model per provider in Settings. */
+  SUMMARIZER_MODEL: z.string().default('claude-haiku-4-5'),
 
   /** 32-byte secret (hex or base64) used to AES-256-GCM encrypt user-supplied
-   *  credentials (currently: per-user Anthropic API keys). Rotating it
-   *  invalidates every stored secret. */
+   *  credentials (per-user LLM API keys). Rotating it invalidates every stored secret. */
   USER_SECRETS_KEY: z.string().min(32),
 
   S3_ENDPOINT: z.string().url().optional(),

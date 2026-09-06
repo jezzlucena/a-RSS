@@ -1,147 +1,121 @@
 import Foundation
-import Observation
 
-enum AuthStatus {
-    case unknown
-    case authenticated
-    case anonymous
+enum AuthStatus: Equatable {
+    case unknown, authenticated, anonymous
 }
 
+/// Mirrors apps/web/src/stores/auth.ts. The access token lives inside the API client (memory
+/// only); the session survives relaunches through the refresh cookie, which `hydrate()`
+/// exercises with one silent refresh before asking for `/me`.
 @Observable
-@MainActor
 final class AuthStore {
-    var status: AuthStatus = .unknown
-    var me: MeResponse?
-    var lastError: String?
+    private(set) var status: AuthStatus = .unknown
+    private(set) var me: MeResponse?
 
-    private let api: APIClient = .shared
+    private let api: any ARSSAPI
+
+    init(api: any ARSSAPI) {
+        self.api = api
+    }
+
+    var hasPassword: Bool { me?.authMethods.contains(.password) ?? false }
+    var llm: LLMSettings? { me?.llm }
+    var activeProvider: LLMProviderState? { llm?.active }
+    var isLlmConfigured: Bool { activeProvider?.configured ?? false }
 
     func hydrate() async {
-        let restored = await api.tryRestoreSession()
-        if restored {
-            await fetchMe()
+        guard status == .unknown else { return }
+        if await api.restoreSession() {
+            await fetchMeAndStore()
         } else {
             status = .anonymous
         }
     }
 
-    private func fetchMe() async {
+    /// Any `/me` failure drops the session locally (web rule) — the refresh cookie is left
+    /// alone, so the next launch can still recover.
+    private func fetchMeAndStore() async {
         do {
-            let me: MeResponse = try await api.get("/me")
-            self.me = me
-            self.status = .authenticated
+            me = try await api.me()
+            status = .authenticated
         } catch {
-            self.me = nil
-            self.status = .anonymous
+            me = nil
+            status = .anonymous
             await api.setAccessToken(nil)
         }
     }
 
-    func signup(email: String, password: String, displayName: String?) async {
-        lastError = nil
-        do {
-            let tokens: AuthTokensResponse = try await api.post(
-                "/auth/signup",
-                body: SignupRequest(email: email, password: password, displayName: displayName)
-            )
-            await api.setAccessToken(tokens.accessToken)
-            await fetchMe()
-        } catch {
-            lastError = (error as? APIError)?.errorDescription ?? error.localizedDescription
-        }
+    private func adopt(_ tokens: AuthTokensResponse) async {
+        await api.setAccessToken(tokens.accessToken)
+        await fetchMeAndStore()
     }
 
-    func login(email: String, password: String) async {
-        lastError = nil
-        do {
-            let tokens: AuthTokensResponse = try await api.post(
-                "/auth/login",
-                body: LoginRequest(email: email, password: password)
-            )
-            await api.setAccessToken(tokens.accessToken)
-            await fetchMe()
-        } catch {
-            lastError = (error as? APIError)?.errorDescription ?? error.localizedDescription
-        }
+    func login(email: String, password: String) async throws {
+        await adopt(try await api.login(LoginRequest(email: email, password: password)))
     }
 
-    func requestMagic(email: String) async -> Bool {
-        lastError = nil
-        do {
-            try await api.post("/auth/magic/request", body: MagicRequest(email: email))
-            return true
-        } catch {
-            lastError = (error as? APIError)?.errorDescription ?? error.localizedDescription
-            return false
-        }
+    func signup(email: String, password: String, displayName: String) async throws {
+        let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        await adopt(try await api.signup(SignupRequest(email: email, password: password, displayName: name.isEmpty ? nil : name)))
     }
 
-    func consumeMagic(token: String) async -> Bool {
-        lastError = nil
-        do {
-            let tokens: AuthTokensResponse = try await api.post(
-                "/auth/magic/consume",
-                body: MagicConsumeRequest(token: token)
-            )
-            await api.setAccessToken(tokens.accessToken)
-            await fetchMe()
-            return status == .authenticated
-        } catch {
-            lastError = (error as? APIError)?.errorDescription ?? error.localizedDescription
-            return false
-        }
+    func requestMagicLink(email: String) async throws {
+        try await api.requestMagicLink(email: email)
     }
 
-    func loginWithGoogle(idToken: String) async {
-        lastError = nil
-        struct GoogleAuthRequest: Codable { let idToken: String }
-        do {
-            let tokens: AuthTokensResponse = try await api.post(
-                "/auth/google",
-                body: GoogleAuthRequest(idToken: idToken)
-            )
-            await api.setAccessToken(tokens.accessToken)
-            await fetchMe()
-        } catch {
-            lastError = (error as? APIError)?.errorDescription ?? error.localizedDescription
-        }
+    func consumeMagicLink(token: String) async throws {
+        await adopt(try await api.consumeMagicLink(token: token))
     }
 
-    func loginWithApple(
-        identityToken: String,
-        email: String?,
-        givenName: String?,
-        familyName: String?
-    ) async {
-        lastError = nil
-        struct FullName: Codable {
-            let givenName: String?
-            let familyName: String?
-        }
-        struct AppleAuthRequest: Codable {
-            let identityToken: String
-            let email: String?
-            let fullName: FullName?
-        }
-        let fullName: FullName? =
-            (givenName != nil || familyName != nil)
-                ? FullName(givenName: givenName, familyName: familyName)
-                : nil
-        do {
-            let tokens: AuthTokensResponse = try await api.post(
-                "/auth/apple",
-                body: AppleAuthRequest(identityToken: identityToken, email: email, fullName: fullName)
-            )
-            await api.setAccessToken(tokens.accessToken)
-            await fetchMe()
-        } catch {
-            lastError = (error as? APIError)?.errorDescription ?? error.localizedDescription
-        }
+    func signInWithGoogle(idToken: String) async throws {
+        await adopt(try await api.signInWithGoogle(idToken: idToken))
     }
 
+    func signInWithApple(_ request: AppleAuthRequest) async throws {
+        await adopt(try await api.signInWithApple(request))
+    }
+
+    /// The server rotates both tokens, so the response replaces the access token in place.
+    func changePassword(newPassword: String, currentPassword: String?) async throws {
+        let current = currentPassword?.isEmpty == false ? currentPassword : nil
+        await adopt(try await api.changePassword(ChangePasswordRequest(newPassword: newPassword, currentPassword: current)))
+    }
+
+    func selectLlmProvider(_ id: LLMProviderID) async throws {
+        try await api.selectLlmProvider(id)
+        await fetchMeAndStore()
+    }
+
+    /// nil leaves a field alone; an empty `model`/`baseUrl` string resets the override.
+    func saveLlmCredential(_ id: LLMProviderID, apiKey: String?, model: String?, baseUrl: String?) async throws {
+        var request = UpsertLLMCredentialRequest(apiKey: apiKey)
+        if let model { request.model = model.isEmpty ? .clear : .set(model) }
+        if let baseUrl { request.baseUrl = baseUrl.isEmpty ? .clear : .set(baseUrl) }
+        try await api.upsertLlmCredential(id, request)
+        await fetchMeAndStore()
+    }
+
+    func removeLlmCredential(_ id: LLMProviderID) async throws {
+        try await api.removeLlmCredential(id)
+        await fetchMeAndStore()
+    }
+
+    func reloadMe() async {
+        await fetchMeAndStore()
+    }
+
+    /// Best-effort server logout (it clears the refresh cookie), then unconditional local reset.
     func logout() async {
-        do { try await api.postEmpty("/auth/logout") } catch { /* best effort */ }
+        try? await api.logout()
         await api.setAccessToken(nil)
+        me = nil
+        status = .anonymous
+    }
+
+    /// Stores call this with any error they catch; a dead session flips the app to the login
+    /// screen instead of leaving a half-working UI behind.
+    func noteError(_ error: any Error) {
+        guard case .unauthenticated = error as? APIError else { return }
         me = nil
         status = .anonymous
     }

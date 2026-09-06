@@ -1,128 +1,194 @@
-import SwiftUI
 import AuthenticationServices
+import SwiftUI
 
+/// Mirrors apps/web/src/pages/Login.tsx, plus native Apple sign-in and a "paste link" path
+/// for magic links (the email links to the web app, not to the `arss://` scheme).
 struct LoginView: View {
     @Environment(AuthStore.self) private var auth
     @Environment(\.colorScheme) private var colorScheme
 
+    private enum Pending { case none, login, magic, google, apple }
+
     @State private var email = ""
     @State private var password = ""
-    @State private var pending: PendingState = .none
+    @State private var pending: Pending = .none
+    @State private var error: String?
     @State private var magicSent = false
     @State private var showSignup = false
+    @State private var showPasteLink = false
+    @State private var pastedLink = ""
+    @State private var magicToken: MagicToken?
 
-    private enum PendingState { case none, login, magic }
+    private var busy: Bool { pending != .none }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("Email", text: $email)
-                        .keyboardType(.emailAddress)
-                        .textContentType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    SecureField("Password", text: $password)
-                        .textContentType(.password)
-                }
-                Section {
-                    Button(action: { Task { await login() } }) {
-                        if pending == .login { ProgressView() } else { Text("Sign in") }
+            AuthScaffold(heading: "Sign in") {
+                VStack(alignment: .leading, spacing: 20) {
+                    FormField(label: "Email") {
+                        TextField("you@example.com", text: $email)
+                            .accessibilityIdentifier("login.email")
+                            .textContentType(.emailAddress)
+                            .keyboardType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
                     }
-                    .disabled(email.isEmpty || password.isEmpty || pending != .none)
+                    FormField(label: "Password") {
+                        SecureField("••••••••", text: $password)
+                            .accessibilityIdentifier("login.password")
+                            .textContentType(.password)
+                            .onSubmit { Task { await signIn() } }
+                    }
 
-                    Button(action: { Task { await sendMagic() } }) {
-                        if pending == .magic { ProgressView() } else { Text("Send magic link") }
+                    if magicSent {
+                        StatusText(message: "If that email exists, a sign-in link is on its way.")
                     }
-                    .disabled(email.isEmpty || pending != .none)
-                }
-                if magicSent {
-                    Section {
-                        Label("If that email exists, a sign-in link is on its way.",
-                              systemImage: "envelope.badge")
-                            .foregroundStyle(.green)
+                    if let error {
+                        ErrorBanner(message: error)
                     }
-                }
-                if let err = auth.lastError {
-                    Section {
-                        Label(err, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.red)
+
+                    Button {
+                        Task { await signIn() }
+                    } label: {
+                        Text(pending == .login ? "Signing in…" : "Sign in")
+                            .frame(maxWidth: .infinity)
                     }
-                }
-                Section {
-                    SignInWithAppleButton(
-                        onRequest: { request in
-                            request.requestedScopes = [.fullName, .email]
-                        },
-                        onCompletion: { result in
-                            Task { await handleAppleAuth(result) }
-                        }
-                    )
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
+                    .disabled(busy)
+                    .accessibilityIdentifier("login.submit")
+
+                    Button {
+                        Task { await sendMagicLink() }
+                    } label: {
+                        Text(pending == .magic ? "Sending…" : "Send magic link")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.glass)
+                    .controlSize(.large)
+                    .disabled(busy)
+
+                    Button("I have a sign-in link", systemImage: "link") {
+                        showPasteLink = true
+                    }
+                    .font(.chip)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.muted)
+
+                    HStack {
+                        Rectangle().fill(Color.rule).frame(height: 1)
+                        KickerText("or")
+                        Rectangle().fill(Color.rule).frame(height: 1)
+                    }
+
+                    SignInWithAppleButton(.signIn) { request in
+                        request.requestedScopes = [.email, .fullName]
+                    } onCompletion: { result in
+                        Task { await signInWithApple(result) }
+                    }
                     .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-                    .frame(height: 44)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                }
-                Section {
-                    Button(action: { Task { await signInWithGoogle() } }) {
-                        Label("Continue with Google", systemImage: "g.circle")
+                    .frame(height: 48)
+                    .disabled(busy)
+
+                    if GoogleSignInService.isConfigured {
+                        Button {
+                            Task { await signInWithGoogle() }
+                        } label: {
+                            Label(pending == .google ? "Signing in…" : "Continue with Google", systemImage: "g.circle")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.glass)
+                        .controlSize(.large)
+                        .disabled(busy)
+                    } else {
+                        StatusText(message: "Set GOOGLE_CLIENT_ID in ios/Local.xcconfig to enable Google sign-in.")
                     }
-                    .disabled(!GoogleSignInService.isConfigured || pending != .none)
-                    if !GoogleSignInService.isConfigured {
-                        Text("Set GOOGLE_CLIENT_ID + GOOGLE_REVERSED_CLIENT_ID in your build settings to enable Google sign-in.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+
+                    HStack(spacing: 4) {
+                        Text("New here?").font(.callout).foregroundStyle(Color.muted)
+                        Button("Create an account →") { showSignup = true }
+                            .font(.callout.weight(.semibold))
+                            .buttonStyle(.plain)
+                            .foregroundStyle(Color.vermilion)
                     }
-                }
-                Section {
-                    Button("Create an account") { showSignup = true }
+                    .padding(.top, 8)
                 }
             }
-            .navigationTitle("Sign in to a-RSS")
-            .sheet(isPresented: $showSignup) {
-                SignupView()
+            .navigationDestination(isPresented: $showSignup) { SignupView() }
+            .toolbar(.hidden, for: .navigationBar)
+        }
+        .alert("Paste your sign-in link", isPresented: $showPasteLink) {
+            TextField("https://…/auth/magic?t=…", text: $pastedLink)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+            Button("Open") {
+                if let token = DeepLink.magicToken(inPastedText: pastedLink) {
+                    magicToken = MagicToken(value: token)
+                } else {
+                    error = "That doesn't look like a sign-in link"
+                }
+                pastedLink = ""
             }
+            Button("Cancel", role: .cancel) { pastedLink = "" }
+        } message: {
+            Text("Copy the link from the email we sent and paste it here.")
+        }
+        .sheet(item: $magicToken) { token in
+            MagicConsumeView(token: token.value)
         }
     }
 
-    private func login() async {
+    private func signIn() async {
         pending = .login
+        error = nil
         defer { pending = .none }
-        await auth.login(email: email, password: password)
+        do {
+            try await auth.login(email: email, password: password)
+        } catch {
+            self.error = error.userMessage(fallback: "Login failed")
+        }
     }
 
-    private func sendMagic() async {
+    private func sendMagicLink() async {
+        let address = email.trimmingCharacters(in: .whitespaces)
+        guard !address.isEmpty else {
+            error = "Enter an email first"
+            return
+        }
         pending = .magic
-        let ok = await auth.requestMagic(email: email)
-        magicSent = ok
-        pending = .none
+        error = nil
+        defer { pending = .none }
+        do {
+            try await auth.requestMagicLink(email: address)
+            magicSent = true
+        } catch {
+            self.error = error.userMessage(fallback: "Could not send magic link")
+        }
     }
 
     private func signInWithGoogle() async {
+        pending = .google
+        error = nil
+        defer { pending = .none }
         do {
             guard let idToken = try await GoogleSignInService.signIn() else { return }
-            await auth.loginWithGoogle(idToken: idToken)
+            try await auth.signInWithGoogle(idToken: idToken)
         } catch {
-            // Errors surface via auth.lastError on subsequent calls; no direct setter.
+            self.error = error.userMessage(fallback: "Google sign-in failed")
         }
     }
 
-    private func handleAppleAuth(_ result: Result<ASAuthorization, Error>) async {
-        switch result {
-        case .success(let authResult):
-            guard
-                let credential = authResult.credential as? ASAuthorizationAppleIDCredential,
-                let tokenData = credential.identityToken,
-                let identityToken = String(data: tokenData, encoding: .utf8)
-            else { return }
-            await auth.loginWithApple(
-                identityToken: identityToken,
-                email: credential.email,
-                givenName: credential.fullName?.givenName,
-                familyName: credential.fullName?.familyName
-            )
-        case .failure:
-            // User cancelled or system error; ignore silently — Apple's button shows its own UX.
-            break
+    private func signInWithApple(_ result: Result<ASAuthorization, any Error>) async {
+        pending = .apple
+        error = nil
+        defer { pending = .none }
+        do {
+            let authorization = try result.get()
+            try await auth.signInWithApple(AppleSignInPayload.request(from: authorization))
+        } catch let failure as ASAuthorizationError where failure.code == .canceled {
+            return
+        } catch {
+            self.error = error.userMessage(fallback: "Apple sign-in failed")
         }
     }
 }

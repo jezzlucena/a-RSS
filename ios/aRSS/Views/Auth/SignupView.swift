@@ -1,94 +1,79 @@
 import SwiftUI
-import AuthenticationServices
 
+/// Mirrors apps/web/src/pages/Signup.tsx.
 struct SignupView: View {
     @Environment(AuthStore.self) private var auth
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var colorScheme
 
     @State private var email = ""
     @State private var password = ""
     @State private var displayName = ""
     @State private var pending = false
+    @State private var error: String?
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("Email", text: $email)
-                        .keyboardType(.emailAddress)
+        AuthScaffold(heading: "Create an account") {
+            VStack(alignment: .leading, spacing: 20) {
+                FormField(label: "Email") {
+                    TextField("you@example.com", text: $email)
                         .textContentType(.emailAddress)
+                        .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                    SecureField("Password (8+ chars)", text: $password)
+                }
+                FormField(label: "Password (8+ chars)") {
+                    SecureField("••••••••", text: $password)
                         .textContentType(.newPassword)
-                    TextField("Display name (optional)", text: $displayName)
+                }
+                FormField(label: "Display name (optional)") {
+                    TextField("Ada", text: $displayName)
                         .textContentType(.name)
                 }
-                Section {
-                    Button(action: { Task { await submit() } }) {
-                        if pending { ProgressView() } else { Text("Create account") }
-                    }
-                    .disabled(pending || email.isEmpty || password.count < 8)
+
+                if let error {
+                    ErrorBanner(message: error)
                 }
-                Section {
-                    SignInWithAppleButton(
-                        .signUp,
-                        onRequest: { request in
-                            request.requestedScopes = [.fullName, .email]
-                        },
-                        onCompletion: { result in
-                            Task { await handleAppleAuth(result) }
-                        }
-                    )
-                    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-                    .frame(height: 44)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+
+                Button {
+                    Task { await submit() }
+                } label: {
+                    Text(pending ? "Creating account…" : "Create account")
+                        .frame(maxWidth: .infinity)
                 }
-                if let err = auth.lastError {
-                    Section {
-                        Label(err, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.red)
-                    }
+                .buttonStyle(.glassProminent)
+                .controlSize(.large)
+                .disabled(pending)
+
+                HStack(spacing: 4) {
+                    Text("Already have an account?").font(.callout).foregroundStyle(Color.muted)
+                    Button("Sign in →") { dismiss() }
+                        .font(.callout.weight(.semibold))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Color.vermilion)
                 }
-            }
-            .navigationTitle("Sign up")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
+                .padding(.top, 8)
             }
         }
+        .toolbar(.hidden, for: .navigationBar)
     }
 
     private func submit() async {
+        error = nil
+        // The web relies on the browser's `required` / `minLength=8`; enforce the same here.
+        guard !email.trimmingCharacters(in: .whitespaces).isEmpty else {
+            error = "Enter an email"
+            return
+        }
+        guard password.count >= 8 else {
+            error = "Password must be at least 8 characters"
+            return
+        }
         pending = true
         defer { pending = false }
-        await auth.signup(
-            email: email,
-            password: password,
-            displayName: displayName.isEmpty ? nil : displayName
-        )
-        if auth.status == .authenticated {
-            dismiss()
-        }
-    }
-
-    private func handleAppleAuth(_ result: Result<ASAuthorization, Error>) async {
-        guard case .success(let authResult) = result,
-              let credential = authResult.credential as? ASAuthorizationAppleIDCredential,
-              let tokenData = credential.identityToken,
-              let identityToken = String(data: tokenData, encoding: .utf8)
-        else { return }
-        await auth.loginWithApple(
-            identityToken: identityToken,
-            email: credential.email,
-            givenName: credential.fullName?.givenName,
-            familyName: credential.fullName?.familyName
-        )
-        if auth.status == .authenticated {
-            dismiss()
+        do {
+            try await auth.signup(email: email, password: password, displayName: displayName)
+        } catch {
+            self.error = error.userMessage(fallback: "Sign up failed")
         }
     }
 }

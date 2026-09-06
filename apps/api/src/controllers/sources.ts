@@ -62,7 +62,8 @@ export const updateSource: RequestHandler = async (req, res) => {
   const { id } = req.params;
   if (!mongoose.isValidObjectId(id)) throw new HttpError(404, 'not_found');
   const body = updateSourceRequest.parse(req.body);
-  if (body.categoryId !== undefined) await assertCategoryOwned(userId, body.categoryId);
+  // null clears the category (no ownership to check); a string must be one of the user's.
+  if (body.categoryId) await assertCategoryOwned(userId, body.categoryId);
 
   // Mark titleOverridden so subsequent polls don't clobber the user's custom title.
   const update: Record<string, unknown> = { ...body };

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { EntryDetail, EntrySummary, ProcessingState } from '@a-rss/shared';
 import { api } from '@/lib/api';
 import { timeAgo } from '@/lib/timeAgo';
+import { useAuthStore, activeLlmProvider } from '@/stores/auth';
 
 export default function EntryDetailPage() {
   const { id } = useParams();
@@ -12,6 +13,7 @@ export default function EntryDetailPage() {
   const [loading, setLoading] = useState(true);
   const [togglingRead, setTogglingRead] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
+  const providerLabel = useAuthStore((s) => activeLlmProvider(s.me)?.shortLabel ?? 'the model');
 
   useEffect(() => {
     if (!id) return;
@@ -162,7 +164,7 @@ export default function EntryDetailPage() {
       {/* Intro */}
       {summarizing && !entry.summary && (
         <p className="font-mono mt-10 text-chip uppercase text-muted">
-          Summarizing… (Claude is reading the article)
+          Summarizing… ({providerLabel} is reading the article)
         </p>
       )}
 

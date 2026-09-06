@@ -12,8 +12,9 @@ correctness over throughput.
 apps/api          Express 4 + TypeScript, Mongoose 8, Agenda jobs, pino logging
 apps/web          React 19 + Vite 6 + Zustand 5 + Tailwind 3 (+ react-toastify)
 packages/shared   Zod schemas + inferred types, consumed as compiled dist/ (@a-rss/shared)
-ios/              SwiftUI client. XcodeGen project.yml is the source of truth;
-                  aRSS.xcodeproj is gitignored/generated. Not in the pnpm workspace.
+ios/              SwiftUI client (iOS 26, Swift 6, Liquid Glass). XcodeGen project.yml is
+                  the source of truth; aRSS.xcodeproj is generated and gitignored. Not in
+                  the pnpm workspace. See "iOS" below.
 docker-compose.yml  mongo, minio, ladder, flaresolverr, and the `dev` container
 .env.example      Every env var, grouped and commented. Copy to .env.
 ```
@@ -58,13 +59,16 @@ must supply Mongo/MinIO/Ladder yourself. Prefer Docker.
 Single root `.env`, validated by `apps/api/src/config/env.ts` (Zod `safeParse`; on
 failure it prints field errors and exits). Required with no default: `MONGO_URL`,
 `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` (16+ chars), `USER_SECRETS_KEY` (32+ chars;
-AES-256-GCM key for per-user Anthropic keys — rotating it invalidates every stored
+AES-256-GCM key for per-user LLM API keys — rotating it invalidates every stored
 key). Optional: `SMTP_URL` (without it, magic links are printed to stdout),
 `GOOGLE_OAUTH_CLIENT_ID`/`VITE_GOOGLE_CLIENT_ID` (must match), `APPLE_CLIENT_ID`, S3 creds.
 
-**There is no server-wide Anthropic API key.** Each user sets their own in Settings;
-summarization fails with `anthropic_api_key_missing` until they do. `SUMMARIZER_MODEL`
-defaults to `claude-haiku-4-5-20251001`.
+**There is no server-wide LLM API key.** Each account picks a provider in Settings
+(Anthropic, OpenAI, Gemini, DeepSeek, Qwen, Kimi, or any OpenAI-compatible endpoint) and
+stores its own keys, one per provider; summarization fails with `llm_not_configured` until
+the active provider has one. `SUMMARIZER_MODEL` (default `claude-haiku-4-5`, undated — never
+append date suffixes to Claude model ids) is only the Anthropic default; other defaults live
+in `packages/shared/src/llm.ts` and every model is overridable per account.
 
 Compose overrides `MONGO_URL` and `LADDER_URL` to container hostnames. Note the code
 default for `LADDER_URL` is port 8080 while compose/.env.example use 8190 — trust `.env`.
@@ -92,11 +96,20 @@ supertest, no web tests. `test/setup.ts` seeds every env var `env.ts` requires; 
 add a required var to `env.ts`, add it there too or every suite that imports `env`
 exits mid-run.
 
-### Verifying for real
+### UI verification is the developer's job — never the agent's
 
-Typecheck and tests don't prove a flow works. For anything a user touches, bring the
-stack up and drive it: `POST /api/v1/auth/signup` with email/password (no SMTP needed),
-then exercise the UI at http://localhost:8088. Say plainly what you did and didn't verify.
+**Under no circumstance should an agent build, run, simulate, or visually test the UI of
+either client.** Concretely, do not: start the Docker stack or `pnpm dev` to open the web
+app, drive http://localhost:8088 in a browser, run Playwright or any browser automation,
+boot or install onto an iOS simulator or device, run `xcodebuild build`/`run` for the app,
+run the `aRSSUITests` target, take screenshots, or otherwise exercise screens. The
+developer does that part.
+
+What *is* fine, and expected: type-checking (`pnpm build`, which compiles shared → api →
+web), API unit tests (`pnpm --filter @a-rss/api test`), and iOS unit tests
+(`xcodebuild test -only-testing:aRSSTests`, which compiles the app target as a side effect
+— that is acceptable; launching it is not). When a change is user-visible, say plainly in
+your report which flows you could not verify and what the developer should click through.
 
 ## Architecture
 
@@ -123,7 +136,7 @@ Throw `HttpError(status, code, message?, retryable = false)` from
 (`ApiErrorBody` in shared). `retryable` means "the same request might succeed if
 re-sent" (rate limit, upstream timeout) vs. a durable condition (bad input, missing
 config). Unclassified 5xx are treated as retryable, 4xx as not. The summarizer maps
-Anthropic SDK error classes onto `SummarizeErrorCode` (shared) and the controller turns
+vendor errors (Anthropic SDK classes, OpenAI-compatible HTTP statuses) onto `SummarizeErrorCode` (shared) and the controller turns
 those into 503 (retryable) or 422. The web client's `api()` parses this into `ApiError`
 with `.code/.message/.retryable`; UI shows `.message` and gates retry buttons on
 `.retryable`. Known gap: Zod failures return `validation_error` with `details` but no
@@ -157,9 +170,11 @@ is the only place a Mongoose doc becomes an API shape; add fields there, not ad 
   `inline` image (tagged `og`); if the page has none, the inline image stays. The winner is
   cached to MinIO/S3. On total failure, falls back to `rawHtml` if long enough
   (`error = "feed_fallback: …"`), else `failed`.
-- `POST /entries/:id/summarize` is the **only** thing that calls Claude → `summarized`.
-  Summarization is deliberately not in the background pipeline: spend is bounded by
-  reader interest, not feed volume.
+- `POST /entries/:id/summarize` is the only server-side path that calls a model →
+  `summarized`. Summarization is deliberately not in the background pipeline: spend is
+  bounded by reader interest, not feed volume. `PUT /entries/:id/summary` is the second
+  path: a client-produced summary (iOS on-device Apple Foundation Models), stored once and
+  never overwritten.
 - `POST /entries/:id/retry` resets to `pending`.
 
 Fetch-pipeline failures (`failed`, `entry.error`, `retryEntry`) and summarization
@@ -187,14 +202,30 @@ Readability and is rejected under 500 chars, so a paywall stub falls through to 
 next strategy. Ladder is a self-hosted proxy; the target URL is appended unencoded on
 purpose (see the comment). FlareSolverr is wired to Ladder in compose, not to Node.
 
-### Summarizer
+### Summarizer (`services/llm/`)
 
-`services/summarizer.ts` builds a `new Anthropic({ apiKey })` per call from the user's
-decrypted key. The long system prompt is sent with `cache_control: { type: 'ephemeral' }`
-and the article in the user turn, so the cached prefix stays stable. **Treat the prompt
-as append-only** — reformatting or reordering it busts the cache for every user. Output
-is `{ intro, bullets: [3] }`, fence-stripped, JSON-parsed, Zod-validated, one retry on
-5xx/parse failure.
+`resolveProvider(user)` turns the account's `llm` settings into a `ResolvedProvider`
+(decrypted key, model, base URL with defaults) or throws `llm_not_configured`; `summarize()`
+picks an adapter by protocol and applies the single retry rule (once on upstream 5xx or an
+unparseable answer), then `classifyError` maps vendor failures onto `SummarizeErrorCode` with
+the provider's name in the message. Two adapters:
+
+- `anthropic.ts` — the official SDK. The long system prompt goes in a `cache_control:
+  ephemeral` block and the article in the user turn so the cached prefix stays stable.
+- `openaiCompatible.ts` — plain `fetch` to `${baseUrl}/chat/completions` for everyone else
+  (OpenAI, Gemini's compat endpoint, DeepSeek, Qwen, Kimi, custom). Lowest common
+  denominator on purpose: `max_tokens` only, no `temperature`, no `response_format`; one
+  transparent re-issue with `max_completion_tokens` when a vendor insists. Status mapping
+  handles Gemini's 400-for-bad-key and 402 billing errors; `TimeoutError`/`AbortError` →
+  `timeout`, fetch `TypeError` → `connection_error`.
+
+`prompt.ts` holds `SYSTEM_PROMPT`, `buildUserMessage` and `parseSummaryOutput`. **Treat the
+prompt as append-only** — reformatting or reordering it busts Anthropic's cache for every
+user. Local OpenAI-compatible servers need a context window ≥ 8192 tokens (Ollama:
+`OLLAMA_CONTEXT_LENGTH`), or the prompt is silently truncated and surfaces as
+`invalid_response`. User-supplied base URLs are normalized and link-local metadata hosts
+refused (`normalizeBaseUrl`). Per-provider credentials live on `User.llm.credentials` (a Map);
+`startupMigrations.ts` moved the old `anthropicApiKeyEnc` there on boot.
 
 ### Web client
 
@@ -230,17 +261,67 @@ is `{ intro, bullets: [3] }`, fence-stripped, JSON-parsed, Zod-validated, one re
 
 ### Shared package
 
-`packages/shared/src`: `auth.ts`, `entries.ts`, `sources.ts`, `feeds.ts`, `common.ts`,
+`packages/shared/src`: `auth.ts`, `entries.ts`, `sources.ts`, `feeds.ts`, `llm.ts` (the
+provider catalog — labels, protocols, default hosts/models — plus the settings and
+client-summary schemas; the API decorates it with per-user state in `/me`), `common.ts`,
 `errors.ts`. Every wire shape is a Zod schema with a `z.infer` type next to it. The API
 parses with the schemas; the web imports only the types (`import type`). When you add
-or change an API field: schema first, rebuild shared, then serializer, then UI.
+or change an API field: schema first, rebuild shared, then serializer, then UI, then the
+matching Swift DTO. `PATCH /sources/:id` accepts `categoryId: null` to un-assign a category
+(added for iOS; the web's "Uncategorized" option still sends `{}` and is a known bug).
 
 ### iOS
 
-SwiftUI, iOS 17+, `actor APIClient` singleton, `@Observable` stores. `Networking/DTOs.swift`
-hand-mirrors the shared schemas and has already drifted (missing `hasAnthropicApiKey`,
-`apple` auth method, `Entry.error`). If you change a shared schema, check DTOs.swift.
-Base URL comes from the `ARSS_API_BASE_URL` build setting in `project.yml`.
+Native SwiftUI client that mirrors the web client's behavior 1:1 (same stores, rules, API
+calls and copy), built for iOS 26 with Swift 6 strict concurrency and Liquid Glass. Layout in
+`ios/aRSS`: `App/` (entry, composition root, root view, deep links), `Networking/` (`APIClient`
+actor, `Endpoints`, `ARSSAPI` protocol + `LiveARSSAPI`, DTOs), `Stores/` (`@Observable`
+Auth/Feed/Sources/Theme/Toast), `Navigation/` (split view on iPad, tabs on iPhone), `Views/`,
+`Theme/`, `Components/`, `Utilities/`. Unit tests in `ios/aRSSTests` (Swift Testing). The
+`ios/aRSSUITests` smoke test drives the real app against a running API and is **for the
+developer only** — agents never run it (see "UI verification is the developer's job").
+
+```bash
+cd ios && ./scripts/generate.sh        # xcodegen + pin SwiftPM deps from ios/Package.resolved
+# Agents: unit tests only.
+xcodebuild -project aRSS.xcodeproj -scheme aRSS -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:aRSSTests test
+# Developer only — end-to-end smoke (Docker stack up, an existing account):
+TEST_RUNNER_SMOKE_EMAIL=… TEST_RUNNER_SMOKE_PASSWORD=… xcodebuild … -only-testing:aRSSUITests test
+```
+
+- **Run `scripts/generate.sh` after adding or removing Swift files** — XcodeGen snapshots the
+  file list, so a new file is invisible to `xcodebuild` until you regenerate.
+- **Default MainActor isolation is on** (`SWIFT_DEFAULT_ACTOR_ISOLATION`). Views, stores and
+  services are main-actor by default; everything in `Networking/` (DTOs, `APIError`,
+  `APIRequest`, the `ARSSAPI` protocol and its extensions) is explicitly `nonisolated` so the
+  `APIClient` actor can use it. New DTOs must follow suit or decoding won't compile.
+- **DTOs mirror `packages/shared/src/*.ts` by hand** (header comment in each `DTOs+*.swift`).
+  When a shared schema changes, update the matching Swift struct. String enums adopt
+  `TolerantEnum` so unknown server values decode to `.unknown` instead of failing the payload.
+- **Summarization goes through `SummarizationService`** (`Summarizing` protocol), which uses
+  the account's cloud provider or, when the per-device `SummarizationPreferences.onDevice`
+  switch is on and Apple Intelligence is available, `FoundationModelsSummarizer` — then
+  uploads the result via `PUT /entries/:id/summary`. The engine hides behind
+  `OnDeviceSummarizing` and is never instantiated in unit tests; refusals fall back to the
+  cloud when one is configured. Settings has an "AI provider" section (driven entirely by
+  `/me`) and an "On this device" toggle.
+- **Stores depend on the `ARSSAPI` protocol**, never on `APIClient` directly; tests inject
+  `FakeARSSAPI`. `FeedStore` is a line-by-line port of `apps/web/src/stores/feed.ts` — change
+  both or neither.
+- **Session**: access token in memory inside the actor; the refresh cookie lives in
+  `HTTPCookieStorage.shared` and restores the session on launch. `RefreshCookieVault` mirrors
+  that one cookie into the Keychain after every auth response because the server rotates it
+  on each refresh and the cookie store flushes lazily — an abrupt kill right after a refresh
+  otherwise loses the session. Nothing else belongs in the Keychain.
+- **Config**: `ARSS_API_BASE_URL` (default `https://api.a-rss.com/api/v1`; set
+  `http://localhost:5088/api/v1` in `Local.xcconfig` for the Docker stack),
+  `GOOGLE_CLIENT_ID` / `GOOGLE_REVERSED_CLIENT_ID` and `DEVELOPMENT_TEAM` come from the
+  gitignored `ios/Local.xcconfig` (see `Local.xcconfig.example`). The Google button hides
+  itself when the id is empty. Magic links arrive as `arss://auth/magic?t=…` or a pasted web link.
+- **Liquid Glass is used sparingly**: system toolbars/tab bar, the "N new" pill, toasts, and
+  primary CTAs. Cards and rows are opaque paper surfaces on purpose.
+- Stable Xcode needs the simulator runtime matching its SDK installed (Xcode › Settings ›
+  Components, or `xcodebuild -downloadPlatform iOS`) before it will offer any destination.
 
 ## Conventions
 
@@ -267,6 +348,9 @@ Base URL comes from the `ARSS_API_BASE_URL` build setting in `project.yml`.
 **Before changing anything**, read the file's comments and the nearest test. Most
 surprising code in this repo is deliberate and says so.
 
+**Never verify UI yourself.** Type-check and run unit tests; leave building, running,
+simulating and looking at either client to the developer (details above).
+
 **Think in the whole stack.** A schema field is a shared change + rebuild + serializer
 + web type + DTOs.swift check. An error is a code in shared + `HttpError` + UI message
 + `retryable` decision. Do all the parts, or say which you left out and why.
@@ -284,9 +368,10 @@ then extract.
 message that reads correctly verbatim in the UI, and an honest `retryable`.
 
 **Definition of done** for a change:
-1. `pnpm build` passes (shared → api → web) and `pnpm --filter @a-rss/api test` passes.
-2. The real flow was exercised in the Docker stack when the change is user-visible,
-   or you state that it wasn't.
+1. `pnpm build` passes (shared → api → web), `pnpm --filter @a-rss/api test` passes, and
+   for iOS changes `xcodebuild test -only-testing:aRSSTests` passes.
+2. You did **not** build, run, simulate, or visually test the UI. For user-visible changes
+   your report names the flows the developer should verify by hand.
 3. Nothing was reformatted that didn't need to be (especially the summarizer prompt).
 4. Comments were updated where an invariant moved.
 5. Warts you noticed but didn't fix are reported, not silently fixed or ignored.

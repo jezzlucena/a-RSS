@@ -31,6 +31,8 @@ export const createSourceRequest = z.object({
 export type CreateSourceRequest = z.infer<typeof createSourceRequest>;
 
 export const updateSourceRequest = createSourceRequest.partial().extend({
+  // `null` un-assigns the category; omitting the key leaves it alone.
+  categoryId: objectIdSchema.nullable().optional(),
   title: z.string().min(1).max(200).optional(),
 });
 export type UpdateSourceRequest = z.infer<typeof updateSourceRequest>;

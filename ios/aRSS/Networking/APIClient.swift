@@ -1,188 +1,211 @@
 import Foundation
 
-enum APIError: LocalizedError {
-    case http(status: Int, code: String?, message: String?)
-    case decoding(Error)
-    case transport(Error)
-    case noResponse
-
-    var errorDescription: String? {
-        switch self {
-        case .http(_, _, let message): return message ?? "Request failed"
-        case .decoding(let err): return "Could not parse response: \(err.localizedDescription)"
-        case .transport(let err): return err.localizedDescription
-        case .noResponse: return "No response from server"
-        }
-    }
-
-    var status: Int? {
-        if case .http(let s, _, _) = self { return s }
-        return nil
-    }
-}
-
-struct APIErrorBody: Decodable {
-    let error: String?
-    let message: String?
-}
-
+/// HTTP transport for the a-RSS API. Owns the in-memory access token (never persisted —
+/// same as the web client's module-level variable) and the single-flight refresh.
+///
+/// The refresh token is an httpOnly cookie (`arss_refresh`, Path=/api/v1/auth) that the
+/// server rotates on every refresh; `HTTPCookieStorage.shared` persists it across launches
+/// and attaches it to `POST /auth/refresh` automatically, which is how a cold start
+/// restores the session without any Keychain code.
 actor APIClient {
-    static let shared = APIClient()
-
-    private let baseURL: URL
+    nonisolated let baseURL: URL
     private let session: URLSession
-    private let decoder: JSONDecoder
-    private let encoder: JSONEncoder
-
+    /// Mirrors the refresh cookie into the Keychain (see `RefreshCookieVault`). Off in tests.
+    private let persistsRefreshCookie: Bool
     private var accessToken: String?
     private var refreshTask: Task<String?, Never>?
 
-    init() {
-        let bundleURL = Bundle.main.object(forInfoDictionaryKey: "ARSS_API_BASE_URL") as? String
-        let resolved = bundleURL?.isEmpty == false ? bundleURL! : "http://localhost:4000/api/v1"
-        guard let url = URL(string: resolved) else {
-            preconditionFailure("ARSS_API_BASE_URL is invalid: \(resolved)")
-        }
-        self.baseURL = url
+    init(baseURL: URL, session: URLSession? = nil, persistsRefreshCookie: Bool = true) {
+        self.baseURL = baseURL
+        self.session = session ?? APIClient.makeSession()
+        self.persistsRefreshCookie = persistsRefreshCookie
+    }
 
+    /// The cookie's scope: `Path=/api/v1/auth`, so any URL under `/auth/` matches.
+    private nonisolated var authCookieURL: URL { baseURL.appending(path: "auth/refresh") }
+
+    /// `protocolClasses` lets tests plug in a `URLProtocol` stub without touching global state.
+    nonisolated static func makeSession(protocolClasses: [AnyClass]? = nil) -> URLSession {
         let config = URLSessionConfiguration.default
-        config.httpCookieStorage = HTTPCookieStorage.shared
+        config.httpCookieStorage = .shared
         config.httpCookieAcceptPolicy = .always
         config.httpShouldSetCookies = true
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
-        self.session = URLSession(configuration: config)
-
-        self.decoder = JSONDecoder()
-        self.encoder = JSONEncoder()
+        config.waitsForConnectivity = false
+        if let protocolClasses { config.protocolClasses = protocolClasses }
+        return URLSession(configuration: config)
     }
 
-    func setAccessToken(_ token: String?) { accessToken = token }
+    // MARK: Token
 
-    func currentAccessToken() -> String? { accessToken }
+    func setAccessToken(_ token: String?) {
+        accessToken = token
+    }
 
-    /// Tries to silently restore the session via the refresh cookie. Returns true on success.
+    var currentAccessToken: String? { accessToken }
+
+    /// Silent session restore on launch: one refresh against the cookie. Mirrors the web's
+    /// `tryRestoreSession()`.
     func tryRestoreSession() async -> Bool {
-        let token = await refreshIfPossible()
-        return token != nil
+        restoreRefreshCookieFromVault()
+        return await refresh() != nil
     }
 
-    @discardableResult
-    private func refreshIfPossible() async -> String? {
-        if let existing = refreshTask {
-            return await existing.value
+    // MARK: Requests
+
+    func send<T: Decodable & Sendable>(_ request: APIRequest) async throws -> T {
+        let (data, _) = try await perform(request)
+        do {
+            return try JSONCoding.makeDecoder().decode(T.self, from: data)
+        } catch let error as DecodingError {
+            throw APIError.decoding(Self.describe(error))
         }
-        let task = Task<String?, Never> { [weak self] in
-            guard let self else { return nil }
+    }
+
+    /// For 204 / body-less responses, and responses whose body the caller doesn't need.
+    func send(_ request: APIRequest) async throws {
+        _ = try await perform(request)
+    }
+
+    /// Raw bytes (the OPML export is XML, not JSON) through the same auth + refresh path.
+    func download(_ request: APIRequest) async throws -> Data {
+        try await perform(request).0
+    }
+
+    // MARK: Internals
+
+    private func perform(_ request: APIRequest) async throws -> (Data, HTTPURLResponse) {
+        var (data, response) = try await execute(request)
+        if request.path.hasPrefix("/auth/") {
+            syncRefreshCookieToVault(afterLogout: request.path == "/auth/logout")
+        }
+        if response.statusCode == 401, request.retryOnUnauthorized {
+            // One refresh, one replay — never recursive.
+            if await refresh() != nil {
+                (data, response) = try await execute(request)
+            }
+            if response.statusCode == 401 {
+                accessToken = nil
+                throw APIError.unauthenticated
+            }
+        }
+        guard (200..<300).contains(response.statusCode) else {
+            throw Self.makeError(status: response.statusCode, data: data)
+        }
+        return (data, response)
+    }
+
+    private func execute(_ request: APIRequest) async throws -> (Data, HTTPURLResponse) {
+        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
+            throw APIError.transport("Invalid base URL \(baseURL)")
+        }
+        let basePath = components.path.hasSuffix("/") ? String(components.path.dropLast()) : components.path
+        let relative = request.path.hasPrefix("/") ? request.path : "/" + request.path
+        components.path = basePath + relative
+        components.queryItems = request.query.isEmpty ? nil : request.query
+        guard let url = components.url else {
+            throw APIError.transport("Could not build URL for \(request.path)")
+        }
+
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = request.method.rawValue
+        urlRequest.setValue(request.accept, forHTTPHeaderField: "Accept")
+        if let body = request.body {
+            urlRequest.httpBody = body
+            urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        if let accessToken {
+            urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
+
+        do {
+            let (data, response) = try await session.data(for: urlRequest)
+            guard let http = response as? HTTPURLResponse else {
+                throw APIError.transport("Not an HTTP response")
+            }
+            return (data, http)
+        } catch let error as APIError {
+            throw error
+        } catch {
+            throw APIError.transport(error.localizedDescription)
+        }
+    }
+
+    /// Single-flight: concurrent 401s share one `POST /auth/refresh`, exactly like the web
+    /// client's `refreshPromise`. Returns the new access token or nil.
+    private func refresh() async -> String? {
+        if let inFlight = refreshTask {
+            return await inFlight.value
+        }
+        let task = Task<String?, Never> {
             do {
-                let tokens: AuthTokensResponse = try await self.requestRaw(
-                    path: "/auth/refresh",
-                    method: "POST",
-                    body: nil as EmptyBody?,
-                    retryOnUnauthorized: false
-                )
-                await self.setAccessToken(tokens.accessToken)
+                let (data, response) = try await execute(.post("/auth/refresh", retryOnUnauthorized: false))
+                guard (200..<300).contains(response.statusCode) else {
+                    // The server clears the cookie on a rejected refresh; drop our mirror too.
+                    if response.statusCode == 401 { syncRefreshCookieToVault(afterLogout: true) }
+                    return nil
+                }
+                let tokens = try JSONCoding.makeDecoder().decode(AuthTokensResponse.self, from: data)
+                accessToken = tokens.accessToken
+                syncRefreshCookieToVault(afterLogout: false)
                 return tokens.accessToken
             } catch {
                 return nil
             }
         }
         refreshTask = task
-        let result = await task.value
+        let token = await task.value
         refreshTask = nil
-        return result
+        return token
     }
 
-    // MARK: - Public typed helpers
+    // MARK: Refresh cookie persistence
 
-    func get<T: Decodable>(_ path: String) async throws -> T {
-        try await requestRaw(path: path, method: "GET", body: nil as EmptyBody?, retryOnUnauthorized: true)
+    private var storedRefreshCookie: HTTPCookie? {
+        session.configuration.httpCookieStorage?.cookies(for: authCookieURL)?.first { $0.name == RefreshCookieVault.cookieName }
     }
 
-    func post<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
-        try await requestRaw(path: path, method: "POST", body: body, retryOnUnauthorized: true)
-    }
-
-    func post<B: Encodable>(_ path: String, body: B) async throws {
-        let _: EmptyResponse = try await requestRaw(path: path, method: "POST", body: body, retryOnUnauthorized: true)
-    }
-
-    func postEmpty<T: Decodable>(_ path: String) async throws -> T {
-        try await requestRaw(path: path, method: "POST", body: nil as EmptyBody?, retryOnUnauthorized: true)
-    }
-
-    func postEmpty(_ path: String) async throws {
-        let _: EmptyResponse = try await requestRaw(path: path, method: "POST", body: nil as EmptyBody?, retryOnUnauthorized: true)
-    }
-
-    // MARK: - Core
-
-    private func requestRaw<T: Decodable, B: Encodable>(
-        path: String,
-        method: String,
-        body: B?,
-        retryOnUnauthorized: Bool
-    ) async throws -> T {
-        var attempt = try await execute(path: path, method: method, body: body)
-        if attempt.status == 401, retryOnUnauthorized {
-            if let _ = await refreshIfPossible() {
-                attempt = try await execute(path: path, method: method, body: body)
-            }
+    private func syncRefreshCookieToVault(afterLogout: Bool) {
+        guard persistsRefreshCookie else { return }
+        if afterLogout {
+            RefreshCookieVault.clear()
+            return
         }
-        return try decode(response: attempt)
-    }
-
-    private struct RawResponse {
-        let data: Data
-        let status: Int
-    }
-
-    private func execute<B: Encodable>(path: String, method: String, body: B?) async throws -> RawResponse {
-        let url = baseURL.appendingPathComponent(path.hasPrefix("/") ? String(path.dropFirst()) : path)
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if let token = accessToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        if let body = body {
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try encoder.encode(body)
-        }
-        do {
-            let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse else { throw APIError.noResponse }
-            return RawResponse(data: data, status: http.statusCode)
-        } catch let err as APIError {
-            throw err
-        } catch {
-            throw APIError.transport(error)
+        if let cookie = storedRefreshCookie {
+            RefreshCookieVault.save(cookie)
         }
     }
 
-    private func decode<T: Decodable>(response: RawResponse) throws -> T {
-        if response.status == 204 || response.data.isEmpty {
-            if T.self == EmptyResponse.self {
-                return EmptyResponse() as! T
-            }
-            throw APIError.http(status: response.status, code: nil, message: "Empty body")
+    /// Before the launch refresh: if the Keychain holds a newer cookie than the store, seed it.
+    private func restoreRefreshCookieFromVault() {
+        guard persistsRefreshCookie, let vaulted = RefreshCookieVault.load(), let storage = session.configuration.httpCookieStorage else { return }
+        if let current = storedRefreshCookie, current.value == vaulted.value { return }
+        storage.setCookie(vaulted)
+    }
+
+    nonisolated private static func makeError(status: Int, data: Data) -> APIError {
+        if let body = try? JSONCoding.makeDecoder().decode(APIErrorBody.self, from: data) {
+            // validation_error carries `details` but no `message`; fall back to the code,
+            // which is what the web's ApiError does too.
+            let message = body.message ?? (body.error == "validation_error" ? "Invalid request" : body.error)
+            return .http(status: status, code: body.error, message: message, retryable: body.retryable ?? (status >= 500))
         }
-        if !(200..<300).contains(response.status) {
-            let body = try? decoder.decode(APIErrorBody.self, from: response.data)
-            throw APIError.http(status: response.status, code: body?.error, message: body?.message ?? body?.error)
+        // express-rate-limit answers 429 with a plain-text body, not the JSON envelope.
+        if status == 429 {
+            return .http(status: 429, code: "rate_limited", message: "Too many requests. Wait a moment and try again.", retryable: true)
         }
-        if T.self == EmptyResponse.self {
-            return EmptyResponse() as! T
-        }
-        do {
-            return try decoder.decode(T.self, from: response.data)
-        } catch {
-            throw APIError.decoding(error)
+        let text = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        let message = text.isEmpty || text.count > 200 ? "Request failed (\(status))" : text
+        return .http(status: status, code: "http_\(status)", message: message, retryable: status >= 500)
+    }
+
+    nonisolated private static func describe(_ error: DecodingError) -> String {
+        switch error {
+        case .keyNotFound(let key, let ctx): "missing key \(key.stringValue) at \(ctx.codingPath.map(\.stringValue).joined(separator: "."))"
+        case .typeMismatch(let type, let ctx): "type mismatch for \(type) at \(ctx.codingPath.map(\.stringValue).joined(separator: "."))"
+        case .valueNotFound(let type, let ctx): "null \(type) at \(ctx.codingPath.map(\.stringValue).joined(separator: "."))"
+        case .dataCorrupted(let ctx): ctx.debugDescription
+        @unknown default: String(describing: error)
         }
     }
-}
-
-struct EmptyBody: Encodable {}
-
-struct EmptyResponse: Decodable {
-    init() {}
 }

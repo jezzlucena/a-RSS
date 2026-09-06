@@ -4,3 +4,4 @@ export * from './auth.js';
 export * from './sources.js';
 export * from './entries.js';
 export * from './feeds.js';
+export * from './llm.js';

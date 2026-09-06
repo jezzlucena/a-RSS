@@ -13,6 +13,7 @@ import { env } from './config/env.js';
 import { connectDatabase, disconnectDatabase } from './config/database.js';
 import { errorHandler, notFoundHandler } from './middleware/errors.js';
 import { initAgenda, shutdownAgenda } from './services/agendaService.js';
+import { runStartupMigrations } from './services/startupMigrations.js';
 import { logger } from './services/logger.js';
 import routes from './routes/index.js';
 
@@ -66,6 +67,7 @@ process.on('SIGINT', shutdown);
 async function start(): Promise<void> {
   try {
     await connectDatabase();
+    await runStartupMigrations();
     await initAgenda();
     app.listen(env.API_PORT, () => {
       logger.info({ port: env.API_PORT, env: env.NODE_ENV }, 'a-rss api listening');

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { llmSettings } from './llm.js';
 
 export const emailSchema = z.string().email().toLowerCase().trim();
 
@@ -42,11 +43,6 @@ export const appleAuthRequest = z.object({
 });
 export type AppleAuthRequest = z.infer<typeof appleAuthRequest>;
 
-export const setAnthropicApiKeyRequest = z.object({
-  apiKey: z.string().trim().min(20).max(256),
-});
-export type SetAnthropicApiKeyRequest = z.infer<typeof setAnthropicApiKeyRequest>;
-
 export const changePasswordRequest = z.object({
   currentPassword: z.string().min(1).max(128).optional(),
   newPassword: z.string().min(8).max(128),
@@ -58,7 +54,8 @@ export const meResponse = z.object({
   email: z.string(),
   displayName: z.string().nullable(),
   authMethods: z.array(z.enum(['password', 'magic', 'google', 'apple'])),
-  hasAnthropicApiKey: z.boolean(),
+  /** The account's summarization provider and per-provider configuration state. */
+  llm: llmSettings,
 });
 export type MeResponse = z.infer<typeof meResponse>;
 

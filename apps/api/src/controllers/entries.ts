@@ -9,10 +9,9 @@ import { getUserId } from '../middleware/auth.js';
 import { HttpError } from '../middleware/errors.js';
 import { processEntryNow } from '../services/agendaService.js';
 import { extractArticle } from '../services/articleExtractor.js';
-import { summarize, SummarizeError } from '../services/summarizer.js';
-import { decryptSecret } from '../services/userSecrets.js';
+import { summarize, resolveProvider, SummarizeError } from '../services/llm/index.js';
 import { serializeEntry } from '../services/serializers.js';
-import type { EntryDetail, EntrySummary } from '@a-rss/shared';
+import { clientSummaryRequest, type EntryDetail, type EntrySummary } from '@a-rss/shared';
 
 // When marking from a detail page (no specific feed context), use the broadest one.
 // Other contexts still rely on the bulk mark-read flow.
@@ -102,6 +101,15 @@ export const retryEntry: RequestHandler = async (req, res) => {
   res.status(202).json({ enqueued: true });
 };
 
+function toSummaryDto(summary: { intro?: string | null; bullets: string[]; model: string; generatedAt: Date }): EntrySummary {
+  return {
+    intro: summary.intro ?? null,
+    bullets: summary.bullets as [string, string, string],
+    model: summary.model,
+    generatedAt: summary.generatedAt.toISOString(),
+  };
+}
+
 export const summarizeEntry: RequestHandler = async (req, res) => {
   const userId = getUserId(req);
   const { id } = req.params;
@@ -109,15 +117,9 @@ export const summarizeEntry: RequestHandler = async (req, res) => {
   const entry = await Entry.findOne({ _id: id, userId });
   if (!entry) throw new HttpError(404, 'not_found');
 
-  // Already summarized — return the cached one without calling Claude.
+  // Already summarized — return the cached one without calling any model.
   if (entry.summary) {
-    const cached: EntrySummary = {
-      intro: entry.summary.intro ?? null,
-      bullets: entry.summary.bullets as [string, string, string],
-      model: entry.summary.model,
-      generatedAt: entry.summary.generatedAt.toISOString(),
-    };
-    res.json({ summary: cached, processingState: entry.processingState });
+    res.json({ summary: toSummaryDto(entry.summary), processingState: entry.processingState });
     return;
   }
 
@@ -146,16 +148,16 @@ export const summarizeEntry: RequestHandler = async (req, res) => {
     );
   }
 
-  const user = await User.findById(userId).select('anthropicApiKeyEnc');
-  if (!user?.anthropicApiKeyEnc) {
-    throw new HttpError(
-      412,
-      'anthropic_api_key_missing',
-      'Set your Anthropic API key in Settings to summarize articles',
-      false,
-    );
+  const user = await User.findById(userId).select('llm');
+  if (!user) throw new HttpError(404, 'user_not_found');
+  // Resolved outside the summarize try/catch so a missing configuration is a 412, not a 422.
+  let provider;
+  try {
+    provider = resolveProvider(user);
+  } catch (err) {
+    if (err instanceof SummarizeError) throw new HttpError(412, err.code, err.message, false);
+    throw err;
   }
-  const apiKey = decryptSecret(user.anthropicApiKeyEnc);
 
   let result;
   try {
@@ -164,7 +166,7 @@ export const summarizeEntry: RequestHandler = async (req, res) => {
       byline: article.byline,
       publishedAt: entry.publishedAt,
       articleText: article.textContent,
-      apiKey,
+      provider,
     });
   } catch (err) {
     if (err instanceof SummarizeError) {
@@ -184,13 +186,44 @@ export const summarizeEntry: RequestHandler = async (req, res) => {
   entry.error = null;
   await entry.save();
 
-  const response: EntrySummary = {
-    intro: entry.summary.intro ?? null,
-    bullets: entry.summary.bullets as [string, string, string],
-    model: entry.summary.model,
-    generatedAt: entry.summary.generatedAt.toISOString(),
+  res.json({ summary: toSummaryDto(entry.summary), processingState: 'summarized' });
+};
+
+/**
+ * A summary produced by a client — the iOS app summarizing on-device with Apple Foundation
+ * Models — stored so every client sees it. Idempotent: an entry that already has a summary
+ * keeps it (the "once set, never re-requested" rule applies to client summaries too).
+ */
+export const putEntrySummary: RequestHandler = async (req, res) => {
+  const userId = getUserId(req);
+  const { id } = req.params;
+  if (!mongoose.isValidObjectId(id)) throw new HttpError(404, 'not_found');
+  const body = clientSummaryRequest.parse(req.body);
+  const entry = await Entry.findOne({ _id: id, userId });
+  if (!entry) throw new HttpError(404, 'not_found');
+
+  if (entry.summary) {
+    res.json({ summary: toSummaryDto(entry.summary), processingState: entry.processingState });
+    return;
+  }
+  if (entry.processingState === 'pending') {
+    throw new HttpError(409, 'not_ready', "Article hasn't been fetched yet — try again shortly", true);
+  }
+  if (entry.processingState === 'failed') {
+    throw new HttpError(409, 'fetch_failed', 'The article could not be fetched — retry the fetch first', false);
+  }
+
+  entry.summary = {
+    intro: body.intro ?? null,
+    bullets: body.bullets,
+    model: body.model,
+    generatedAt: new Date(),
   };
-  res.json({ summary: response, processingState: 'summarized' });
+  entry.processingState = 'summarized';
+  entry.error = null;
+  await entry.save();
+
+  res.json({ summary: toSummaryDto(entry.summary), processingState: 'summarized' });
 };
 
 export const setEntryRead: RequestHandler = async (req, res) => {

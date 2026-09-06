@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useFeedStore } from '@/stores/feed';
 import { useSourcesStore } from '@/stores/sources';
+import { useAuthStore, activeLlmProvider } from '@/stores/auth';
 import { timeAgo } from '@/lib/timeAgo';
 import { api, type ApiError } from '@/lib/api';
 import type { Entry, EntryDetail, FeedView } from '@a-rss/shared';
@@ -369,9 +370,12 @@ function EntryCard({
   const toggleRead = useFeedStore((s) => s.toggleRead);
   const retryEntry = useFeedStore((s) => s.retryEntry);
   const [summarizing, setSummarizing] = useState(false);
-  const [summarizeError, setSummarizeError] = useState<{ message: string; retryable: boolean } | null>(
-    null,
-  );
+  const [summarizeError, setSummarizeError] = useState<{
+    message: string;
+    retryable: boolean;
+    code?: string;
+  } | null>(null);
+  const providerLabel = useAuthStore((s) => activeLlmProvider(s.me)?.shortLabel ?? 'the model');
   // Fallback article body: when summarize fails or there's nothing to summarize,
   // fetch the full extracted text from /entries/:id and render it inline.
   const [fallbackText, setFallbackText] = useState<string | null>(null);
@@ -397,6 +401,7 @@ function EntryCard({
         setSummarizeError({
           message: apiErr.message || 'Could not summarize this article.',
           retryable: apiErr.retryable ?? true,
+          code: apiErr.code,
         });
       })
       .finally(() => setSummarizing(false));
@@ -587,7 +592,7 @@ function EntryCard({
         <div>
           {summarizing && (
             <p className="mt-5 font-mono text-chip uppercase text-muted">
-              Summarizing… (Claude is reading the article)
+              Summarizing… ({providerLabel} is reading the article)
             </p>
           )}
 
@@ -603,6 +608,14 @@ function EntryCard({
                 >
                   <span aria-hidden>↻</span> Try again
                 </button>
+              )}
+              {summarizeError.code === 'llm_not_configured' && (
+                <Link
+                  to="/settings"
+                  className="ml-3 text-vermilion-deep underline underline-offset-[3px] hover:no-underline hover:text-vermilion"
+                >
+                  Open Settings
+                </Link>
               )}
             </p>
           )}

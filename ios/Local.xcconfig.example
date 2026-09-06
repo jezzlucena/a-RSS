@@ -1,0 +1,11 @@
+// Copy to ios/Local.xcconfig (gitignored) and fill in what you need. Every key is optional.
+// Google sign-in: both values come from the iOS OAuth client in Google Cloud Console.
+// GOOGLE_CLIENT_ID = 1234567890-abc.apps.googleusercontent.com
+// GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.1234567890-abc
+// Signing for device builds:
+// DEVELOPMENT_TEAM = ABCDE12345
+// Point at a different API. The project defaults to production (https://api.a-rss.com/api/v1);
+// for the Docker dev stack use localhost, or your Mac's LAN IP when running on a device.
+// (The `$()` keeps xcconfig from reading `//` as a comment.)
+// ARSS_API_BASE_URL = http:/$()/localhost:5088/api/v1
+// ARSS_API_BASE_URL = http:/$()/192.168.1.20:5088/api/v1

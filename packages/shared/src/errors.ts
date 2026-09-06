@@ -4,7 +4,7 @@ export type SummarizeErrorCode =
   | 'fetch_failed'
   | 'no_article_body'
   | 'article_too_short'
-  | 'anthropic_api_key_missing'
+  | 'llm_not_configured'
   | 'rate_limited'
   | 'timeout'
   | 'connection_error'
