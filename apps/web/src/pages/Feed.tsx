@@ -681,7 +681,7 @@ function EntryCard({
                     ? summaryScript(entry.title, entry.summary.intro, entry.summary.bullets)
                     : articleScript(entry.title, fallbackText ?? '')
                 }
-                className="inline-flex items-center gap-2 border border-ink px-3 py-1.5 font-mono text-chip uppercase text-ink transition-colors hover:bg-ink hover:text-paper aria-pressed:border-vermilion aria-pressed:text-vermilion aria-pressed:hover:bg-vermilion aria-pressed:hover:text-paper"
+                className="inline-flex h-8 w-8 items-center justify-center border border-ink text-ink transition-colors hover:bg-ink hover:text-paper aria-pressed:border-vermilion aria-pressed:text-vermilion aria-pressed:hover:bg-vermilion aria-pressed:hover:text-paper"
               />
             )}
             <Link

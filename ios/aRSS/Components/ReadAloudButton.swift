@@ -14,7 +14,9 @@ struct ReadAloudButton: View {
         Button {
             reader.toggle(id: id, text: text)
         } label: {
+            // Icon only; the label stays for VoiceOver.
             Label(speaking ? "Stop" : "Read aloud", systemImage: speaking ? "stop.fill" : "speaker.wave.2")
+                .labelStyle(.iconOnly)
         }
         .buttonStyle(.glass)
         .controlSize(.small)

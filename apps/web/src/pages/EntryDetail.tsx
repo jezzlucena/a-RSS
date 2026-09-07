@@ -222,7 +222,7 @@ export default function EntryDetailPage() {
                   ? articleScript(entry.title, articleText)
                   : summaryScript(entry.title, entry.summary?.intro, entry.summary?.bullets ?? [])
               }
-              className="inline-flex items-center gap-2 border border-ink px-5 py-3 font-mono text-chip uppercase text-ink transition-colors hover:bg-ink hover:text-paper aria-pressed:border-vermilion aria-pressed:text-vermilion aria-pressed:hover:bg-vermilion aria-pressed:hover:text-paper"
+              className="inline-flex h-11 w-11 items-center justify-center border border-ink text-ink transition-colors hover:bg-ink hover:text-paper aria-pressed:border-vermilion aria-pressed:text-vermilion aria-pressed:hover:bg-vermilion aria-pressed:hover:text-paper"
             />
           )}
           <a
