@@ -5,13 +5,16 @@ import { HttpError } from '../middleware/errors.js';
 
 export async function buildBaseFilter(userId: string, view: FeedView): Promise<{
   userId: mongoose.Types.ObjectId;
+  dismissedAt: null;
   sourceId?: mongoose.Types.ObjectId | { $in: mongoose.Types.ObjectId[] };
 }> {
   const parsed = parseFeedView(view);
+  // `dismissedAt: null` matches both null and missing — dismissed articles leave the feed.
   const filter: {
     userId: mongoose.Types.ObjectId;
+    dismissedAt: null;
     sourceId?: mongoose.Types.ObjectId | { $in: mongoose.Types.ObjectId[] };
-  } = { userId: new mongoose.Types.ObjectId(userId) };
+  } = { userId: new mongoose.Types.ObjectId(userId), dismissedAt: null };
 
   if (parsed.kind === 'source') {
     if (!mongoose.isValidObjectId(parsed.id)) throw new HttpError(400, 'invalid_view');
@@ -38,7 +41,8 @@ export function encodeCursor(part: CursorPart): string {
   );
 }
 
-export function decodeCursor(cursor: string, order: FeedOrder): Record<string, unknown> {
+/** The `<iso>|<id>` pair behind every keyset cursor (feed pages, failures pages). */
+export function decodeCursorParts(cursor: string): CursorPart {
   let raw: string;
   try {
     raw = Buffer.from(cursor, 'base64url').toString('utf8');
@@ -46,11 +50,14 @@ export function decodeCursor(cursor: string, order: FeedOrder): Record<string, u
     throw new HttpError(400, 'invalid_cursor');
   }
   const [iso, idHex] = raw.split('|');
-  if (!iso || !idHex || !mongoose.isValidObjectId(idHex)) {
+  if (!iso || !idHex || !mongoose.isValidObjectId(idHex) || Number.isNaN(Date.parse(iso))) {
     throw new HttpError(400, 'invalid_cursor');
   }
-  const date = new Date(iso);
-  const id = new mongoose.Types.ObjectId(idHex);
+  return { publishedAt: new Date(iso), id: new mongoose.Types.ObjectId(idHex) };
+}
+
+export function decodeCursor(cursor: string, order: FeedOrder): Record<string, unknown> {
+  const { publishedAt: date, id } = decodeCursorParts(cursor);
   if (order === 'desc') {
     return { $or: [{ publishedAt: { $lt: date } }, { publishedAt: date, _id: { $lt: id } }] };
   }

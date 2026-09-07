@@ -1,25 +1,17 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useAuthStore } from '@/stores/auth';
+import { useFeedStore } from '@/stores/feed';
 import { useThemeStore, type ThemePreference } from '@/stores/theme';
 import { api } from '@/lib/api';
-import type { LlmProviderId, LlmProviderState, UpsertLlmCredentialRequest } from '@a-rss/shared';
+import type {
+  FailedEntry,
+  FailuresResponse,
+  LlmProviderId,
+  LlmProviderState,
+  UpsertLlmCredentialRequest,
+} from '@a-rss/shared';
 
 const THEME_OPTIONS: ThemePreference[] = ['system', 'light', 'dark'];
-
-interface FailedEntry {
-  id: string;
-  sourceId: string;
-  sourceTitle: string;
-  url: string;
-  title: string;
-  publishedAt: string;
-  updatedAt: string;
-  error: string | null;
-}
-
-interface FailuresResponse {
-  items: FailedEntry[];
-}
 
 export default function SettingsPage() {
   const me = useAuthStore((s) => s.me);
@@ -28,10 +20,13 @@ export default function SettingsPage() {
   const setThemePreference = useThemeStore((s) => s.setPreference);
   const changePassword = useAuthStore((s) => s.changePassword);
 
+  // Diagnostics is collapsed by default; the first page loads the first time it's opened.
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [failures, setFailures] = useState<FailedEntry[] | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [retrying, setRetrying] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const hasPassword = me?.authMethods.includes('password') ?? false;
   const [currentPassword, setCurrentPassword] = useState('');
@@ -67,12 +62,15 @@ export default function SettingsPage() {
     }
   }
 
-  async function load() {
+  async function load(cursor: string | null = null) {
     setLoading(true);
     setError(null);
     try {
-      const data = await api<FailuresResponse>('/entries/failures');
-      setFailures(data.items);
+      const query = new URLSearchParams({ limit: '20' });
+      if (cursor) query.set('cursor', cursor);
+      const data = await api<FailuresResponse>(`/entries/failures?${query}`);
+      setFailures((prev) => (cursor ? [...(prev ?? []), ...data.items] : data.items));
+      setNextCursor(data.nextCursor);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load failures');
     } finally {
@@ -80,19 +78,37 @@ export default function SettingsPage() {
     }
   }
 
-  useEffect(() => {
-    void load();
-  }, []);
+  function toggleDiagnostics() {
+    const open = !diagnosticsOpen;
+    setDiagnosticsOpen(open);
+    if (open && failures === null && !loading) void load();
+  }
 
   async function handleRetry(id: string) {
-    setRetrying(id);
+    setBusyId(id);
+    setError(null);
     try {
       await api(`/entries/${id}/retry`, { method: 'POST' });
       setFailures((prev) => prev?.filter((f) => f.id !== id) ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Retry failed');
     } finally {
-      setRetrying(null);
+      setBusyId(null);
+    }
+  }
+
+  /** Hides the article for good — it also leaves the feed and the unread counts. */
+  async function handleDismiss(id: string) {
+    setBusyId(id);
+    setError(null);
+    try {
+      await api(`/entries/${id}/dismiss`, { method: 'POST' });
+      setFailures((prev) => prev?.filter((f) => f.id !== id) ?? null);
+      useFeedStore.getState().removeEntry(id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not dismiss the article');
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -254,74 +270,119 @@ export default function SettingsPage() {
 
       <section className="mt-14 border-t-2 border-ink pt-8">
         <div className="flex items-baseline justify-between gap-3">
-          <div>
+          <button
+            type="button"
+            onClick={toggleDiagnostics}
+            aria-expanded={diagnosticsOpen}
+            aria-controls="diagnostics-panel"
+            className="group text-left"
+          >
             <h2 className="font-mono text-chip uppercase text-muted">Diagnostics</h2>
-            <h3 className="font-display mt-2 text-2xl font-semibold tracking-tight">
+            <h3 className="font-display mt-2 flex items-center gap-2 text-2xl font-semibold tracking-tight">
+              <span
+                aria-hidden
+                className={`inline-block text-base text-muted transition-transform group-hover:text-ink ${
+                  diagnosticsOpen ? 'rotate-90' : ''
+                }`}
+              >
+                ▸
+              </span>
               Recent processing failures
             </h3>
-          </div>
-          <button
-            onClick={() => void load()}
-            disabled={loading}
-            className="font-mono text-chip uppercase text-muted hover:text-ink disabled:opacity-50"
-          >
-            {loading ? 'Loading…' : 'Refresh'}
           </button>
+          {diagnosticsOpen && (
+            <button
+              onClick={() => void load()}
+              disabled={loading}
+              className="font-mono text-chip uppercase text-muted hover:text-ink disabled:opacity-50"
+            >
+              {loading ? 'Loading…' : 'Refresh'}
+            </button>
+          )}
         </div>
         <p className="mt-2 max-w-prose text-sm text-muted">
           Entries the summarizer couldn't fetch or summarize. Common causes: hard paywalls,
-          blocked archives, transient network errors.
+          blocked archives, transient network errors. Retry re-fetches; Dismiss hides the
+          article for good.
         </p>
 
-        {error && (
-          <p
-            role="alert"
-            className="mt-4 border-l-2 border-vermilion pl-3 text-sm text-vermilion-deep"
-          >
-            {error}
-          </p>
-        )}
+        {diagnosticsOpen && (
+          <div id="diagnostics-panel">
+            {error && (
+              <p
+                role="alert"
+                className="mt-4 border-l-2 border-vermilion pl-3 text-sm text-vermilion-deep"
+              >
+                {error}
+              </p>
+            )}
 
-        {failures && failures.length === 0 && (
-          <p className="mt-6 font-display italic text-muted">
-            All clear — nothing failed recently.
-          </p>
-        )}
+            {loading && failures === null && (
+              <p className="mt-6 font-mono text-chip uppercase text-muted">Loading…</p>
+            )}
 
-        {failures && failures.length > 0 && (
-          <ul className="mt-6 divide-y divide-rule border-y border-rule">
-            {failures.map((f) => (
-              <li key={f.id} className="py-5">
-                <div className="flex items-baseline justify-between gap-4">
-                  <p className="font-display text-lg text-ink">{f.title}</p>
-                  <span className="flex-none font-mono text-chip uppercase text-muted">
-                    {f.sourceTitle}
-                  </span>
-                </div>
-                <a
-                  href={f.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-1 block truncate font-mono text-[11px] text-muted underline-offset-2 hover:text-ink hover:underline"
-                  title={f.url}
-                >
-                  {f.url}
-                </a>
-                {f.error && (
-                  <p className="mt-2 break-words font-mono text-[11px] text-vermilion-deep">
-                    {f.error}
-                  </p>
-                )}
-                <button
-                  onClick={() => void handleRetry(f.id)}
-                  disabled={retrying === f.id}
-                  className="mt-3 border border-ink px-3 py-1.5 font-mono text-chip uppercase text-ink hover:bg-ink hover:text-paper disabled:opacity-50"
-                >
-                  {retrying === f.id ? 'Retrying…' : 'Retry'}
-                </button>
-              </li>
-            ))}
-          </ul>
+            {failures && failures.length === 0 && (
+              <p className="mt-6 font-display italic text-muted">
+                All clear — nothing failed recently.
+              </p>
+            )}
+
+            {failures && failures.length > 0 && (
+              <ul className="mt-6 divide-y divide-rule border-y border-rule">
+                {failures.map((f) => (
+                  <li key={f.id} className="py-5">
+                    <div className="flex items-baseline justify-between gap-4">
+                      <p className="font-display text-lg text-ink">{f.title}</p>
+                      <span className="flex-none font-mono text-chip uppercase text-muted">
+                        {f.sourceTitle}
+                      </span>
+                    </div>
+                    <a
+                      href={f.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 block truncate font-mono text-[11px] text-muted underline-offset-2 hover:text-ink hover:underline"
+                      title={f.url}
+                    >
+                      {f.url}
+                    </a>
+                    {f.error && (
+                      <p className="mt-2 break-words font-mono text-[11px] text-vermilion-deep">
+                        {f.error}
+                      </p>
+                    )}
+                    <div className="mt-3 flex items-center gap-2">
+                      <button
+                        onClick={() => void handleRetry(f.id)}
+                        disabled={busyId !== null}
+                        className="border border-ink px-3 py-1.5 font-mono text-chip uppercase text-ink hover:bg-ink hover:text-paper disabled:opacity-50"
+                      >
+                        {busyId === f.id ? 'Working…' : 'Retry'}
+                      </button>
+                      <button
+                        onClick={() => void handleDismiss(f.id)}
+                        disabled={busyId !== null}
+                        title="Hide this article for good"
+                        className="border border-rule px-3 py-1.5 font-mono text-chip uppercase text-muted hover:border-ink hover:text-ink disabled:opacity-50"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {nextCursor && (
+              <button
+                onClick={() => void load(nextCursor)}
+                disabled={loading}
+                className="mt-6 w-full border border-rule py-3 font-mono text-chip uppercase text-muted hover:border-ink hover:text-ink disabled:opacity-50"
+              >
+                {loading ? 'Loading…' : 'Load more'}
+              </button>
+            )}
+          </div>
         )}
       </section>
     </div>
@@ -379,7 +440,7 @@ function AIProviderSection() {
           {llm.providers.map((p) => (
             <option key={p.id} value={p.id}>
               {p.label}
-              {p.configured ? ' · configured' : ''}
+              {p.configured ? ' ✓' : ''}
             </option>
           ))}
         </select>
@@ -574,7 +635,7 @@ function ProviderPanel({
               disabled={saving}
               className="border border-vermilion px-4 py-2 font-mono text-chip uppercase text-vermilion hover:bg-vermilion hover:text-paper disabled:opacity-50"
             >
-              Remove key
+              Clear
             </button>
           )}
         </div>

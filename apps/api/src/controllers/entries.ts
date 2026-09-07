@@ -11,37 +11,37 @@ import { processEntryNow } from '../services/agendaService.js';
 import { extractArticle } from '../services/articleExtractor.js';
 import { summarize, resolveProvider, SummarizeError } from '../services/llm/index.js';
 import { serializeEntry } from '../services/serializers.js';
-import { clientSummaryRequest, type EntryDetail, type EntrySummary } from '@a-rss/shared';
+import { decodeCursorParts, encodeCursor } from '../services/feedQuery.js';
+import { clientSummaryRequest, type EntryDetail, type EntrySummary, type FailedEntry, type FailuresResponse } from '@a-rss/shared';
 
 // When marking from a detail page (no specific feed context), use the broadest one.
 // Other contexts still rely on the bulk mark-read flow.
 const DETAIL_FEED_CONTEXT = 'all';
 const setReadRequest = z.object({ read: z.boolean() });
 
-interface FailedEntrySummary {
-  id: string;
-  sourceId: string;
-  sourceTitle: string;
-  url: string;
-  title: string;
-  publishedAt: string;
-  updatedAt: string;
-  error: string | null;
-}
-
+/** Failed, not-dismissed entries, newest failure first, keyset-paged on (updatedAt, _id). */
 export const listFailures: RequestHandler = async (req, res) => {
   const userId = getUserId(req);
-  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+  const filter: Record<string, unknown> = { userId, processingState: 'failed', dismissedAt: null };
+  if (typeof req.query.cursor === 'string' && req.query.cursor) {
+    const { publishedAt: updatedAt, id } = decodeCursorParts(req.query.cursor);
+    filter.$or = [{ updatedAt: { $lt: updatedAt } }, { updatedAt, _id: { $lt: id } }];
+  }
 
-  const docs = await Entry.find({ userId, processingState: 'failed' })
-    .sort({ updatedAt: -1 })
-    .limit(limit);
+  const page = await Entry.find(filter)
+    .sort({ updatedAt: -1, _id: -1 })
+    .limit(limit + 1);
+  const hasMore = page.length > limit;
+  const docs = hasMore ? page.slice(0, limit) : page;
+  const last = docs[docs.length - 1];
+  const nextCursor = hasMore && last ? encodeCursor({ publishedAt: last.updatedAt, id: last._id }) : null;
 
   const sourceIds = [...new Set(docs.map((d) => String(d.sourceId)))];
   const sources = await Source.find({ _id: { $in: sourceIds } }).select('title');
   const sourceTitles = new Map(sources.map((s) => [s.id, s.title]));
 
-  const items: FailedEntrySummary[] = docs.map((d) => ({
+  const items: FailedEntry[] = docs.map((d) => ({
     id: d.id,
     sourceId: String(d.sourceId),
     sourceTitle: sourceTitles.get(String(d.sourceId)) ?? 'Unknown',
@@ -51,7 +51,23 @@ export const listFailures: RequestHandler = async (req, res) => {
     updatedAt: d.updatedAt.toISOString(),
     error: d.error ?? null,
   }));
-  res.json({ items });
+  const response: FailuresResponse = { items, nextCursor };
+  res.json(response);
+};
+
+/**
+ * Hides a failed article for good: it leaves the feed, the unread counts and diagnostics. The
+ * document stays (with `dismissedAt`) so the next poll's `$setOnInsert` upsert can't bring it back.
+ */
+export const dismissEntry: RequestHandler = async (req, res) => {
+  const userId = getUserId(req);
+  const { id } = req.params;
+  if (!mongoose.isValidObjectId(id)) throw new HttpError(404, 'not_found');
+  const entry = await Entry.findOne({ _id: id, userId });
+  if (!entry) throw new HttpError(404, 'not_found');
+  entry.dismissedAt = new Date();
+  await entry.save();
+  res.status(204).end();
 };
 
 export const getEntry: RequestHandler = async (req, res) => {

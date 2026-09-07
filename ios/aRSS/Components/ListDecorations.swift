@@ -1,22 +1,5 @@
 import SwiftUI
 
-/// Hidden at zero, capped at "999+" — the web's `UnreadBadge`.
-struct UnreadBadge: View {
-    let count: Int
-
-    var body: some View {
-        if count > 0 {
-            Text(count > 999 ? "999+" : String(count))
-                .font(.chip)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2)
-                .background(Color.ink, in: Capsule())
-                .foregroundStyle(Color.paper)
-                .accessibilityLabel("\(count) unread")
-        }
-    }
-}
-
 struct ColorDot: View {
     let hex: String?
     var size: CGFloat = 10

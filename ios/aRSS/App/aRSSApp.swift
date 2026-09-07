@@ -15,6 +15,9 @@ struct aRSSApp: App {
                 .environment(environment.feed)
                 .environment(environment.summarizer)
                 .environment(environment.summarizationPreferences)
+                .environment(environment.navigation)
+                .environment(environment.speech)
+                .environment(environment.layoutMetrics)
         }
     }
 }

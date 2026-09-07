@@ -40,7 +40,12 @@ nonisolated enum Endpoints {
     }
 
     // MARK: Entries
-    static var failures: APIRequest { .get("/entries/failures") }
+    static func failures(cursor: String?, limit: Int = 20) -> APIRequest {
+        var query = [URLQueryItem(name: "limit", value: String(limit))]
+        if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
+        return .get("/entries/failures", query: query)
+    }
+    static func dismissEntry(id: String) -> APIRequest { .post("/entries/\(id)/dismiss") }
     static func entry(id: String) -> APIRequest { .get("/entries/\(id)") }
     static func setEntryRead(id: String, read: Bool) throws -> APIRequest { try .post("/entries/\(id)/read", body: SetEntryReadRequest(read: read)) }
     static func retryEntry(id: String) -> APIRequest { .post("/entries/\(id)/retry") }

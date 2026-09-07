@@ -33,9 +33,26 @@ final class ThemeStore {
         }
     }
 
-    /// The navbar toggle flips to the explicit opposite of what's currently *resolved*; it
-    /// never lands on `system` (web `theme.toggle`).
+    /// The web's navbar toggle: flips to the explicit opposite of what's currently *resolved*.
     func toggle(resolved: ColorScheme) {
         preference = resolved == .dark ? .light : .dark
+    }
+
+    /// The native clients' appearance button: Light → Dark → System → Light.
+    func cycle() {
+        preference = switch preference {
+        case .light: .dark
+        case .dark: .system
+        case .system: .light
+        }
+    }
+
+    /// What the appearance button does next, for tooltips.
+    var nextPreference: ThemePreference {
+        switch preference {
+        case .light: .dark
+        case .dark: .system
+        case .system: .light
+        }
     }
 }

@@ -6,28 +6,36 @@ struct EntryCardView: View {
     let onOpenDetail: (String) -> Void
 
     @Environment(FeedStore.self) private var feed
-    @Environment(\.usesSplitLayout) private var usesSplitLayout
+    @Environment(\.layoutMode) private var layoutMode
 
     private var isExpanded: Bool { feed.expandedID == entry.id }
     private var imageURL: URL? { entry.image.flatMap { URL(string: $0.url) } }
+    /// Only the height-starved iPhone-landscape layout trades the big picture for a thumbnail.
+    private var usesThumbnailRow: Bool { layoutMode == .sideBySide }
+    /// The large centered illustration never grows past this; the title block is capped to the
+    /// same width so its centered box lines up with the picture on every device.
+    private static let illustrationMaxWidth: CGFloat = 448
 
     var body: some View {
-        VStack(alignment: .leading, spacing: usesSplitLayout ? 10 : 14) {
+        VStack(alignment: .leading, spacing: usesThumbnailRow ? 10 : 14) {
             metadataRow
 
-            // Side-by-side layouts have less room per column: the illustration becomes a
-            // thumbnail beside the title. In the tab layout it stays a full-width picture.
-            if usesSplitLayout, let imageURL {
+            // iPhone landscape has very little height: the illustration becomes a thumbnail
+            // beside the title. Everywhere else (portrait, iPad, Mac) it's the large centered
+            // picture above the title.
+            if usesThumbnailRow, let imageURL {
                 HStack(alignment: .top, spacing: 14) {
                     imageButton(imageURL, maxWidth: 120)
                     titleButton
                 }
             } else {
                 if let imageURL {
-                    imageButton(imageURL, maxWidth: 448)
+                    imageButton(imageURL, maxWidth: Self.illustrationMaxWidth)
                         .frame(maxWidth: .infinity)
                 }
                 titleButton
+                    .frame(maxWidth: Self.illustrationMaxWidth)
+                    .frame(maxWidth: .infinity)
             }
 
             if entry.processingState == .failed, let error = entry.error {
@@ -48,7 +56,7 @@ struct EntryCardView: View {
             }
             .clipped()
         }
-        .padding(.vertical, usesSplitLayout ? 12 : 24)
+        .padding(.vertical, usesThumbnailRow ? 12 : 24)
         .opacity(entry.isRead ? 0.4 : 1)
         .animation(.snappy, value: isExpanded)
         .contentShape(Rectangle())
@@ -61,21 +69,42 @@ struct EntryCardView: View {
                 .frame(maxWidth: maxWidth)
         }
         .buttonStyle(.plain)
+        .hoverEffect(.lift)
         .disabled(!entry.canExpand)
         .accessibilityLabel(isExpanded ? "Collapse article" : "Expand article")
     }
 
     /// Not a Button on purpose: a tap toggles expansion while a long press selects the text
     /// for copying (a Button would swallow the long press).
+    /// The picture-above-title layouts (iPhone portrait, iPad, Mac) center the title block under
+    /// the illustration — a one-liner reads as centered; a wrapped title stays left-aligned within
+    /// a box hugging its longest line — and never wider than the illustration itself. The
+    /// roomier iPad/Mac split view gets a larger size. The thumbnail row keeps a plain
+    /// left-aligned title beside the image.
+    @ViewBuilder
+    private var titleText: some View {
+        let color = entry.canExpand ? Color.ink : Color.muted
+        if usesThumbnailRow {
+            Text(entry.title)
+                .font(.headlineSerif)
+                .foregroundStyle(color)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            HuggingText(
+                text: entry.title,
+                uiFont: .serif(layoutMode == .split ? .title1 : .title3, weight: .semibold),
+                color: color
+            )
+        }
+    }
+
     private var titleButton: some View {
-        Text(entry.title)
-            .font(.headlineSerif)
-            .foregroundStyle(entry.canExpand ? Color.ink : Color.muted)
-            .multilineTextAlignment(.leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        titleText
             .textSelection(.enabled)
             .contentShape(Rectangle())
             .onTapGesture { if entry.canExpand { feed.toggleExpanded(entry.id) } }
+            .hoverEffect(.highlight)
             .accessibilityAddTraits(.isHeader)
             .accessibilityAction(named: isExpanded ? "Collapse article" : "Expand article") {
                 if entry.canExpand { feed.toggleExpanded(entry.id) }
@@ -101,6 +130,10 @@ struct EntryCardView: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(Color.vermilion)
                     .help("Re-fetch this article")
+                Button("Dismiss", systemImage: "xmark") { Task { await feed.dismissEntry(entry.id) } }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.muted)
+                    .help("Hide this article for good")
             default:
                 EmptyView()
             }
@@ -129,6 +162,7 @@ struct EntryExpandedBody: View {
 
     @Environment(FeedStore.self) private var feed
     @Environment(SummarizationService.self) private var summarizer
+    @Environment(SummarizationPreferences.self) private var preferences
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.usesSplitLayout) private var usesSplitLayout
 
@@ -153,9 +187,7 @@ struct EntryExpandedBody: View {
                 ErrorBanner(
                     message: failure.message,
                     retry: failure.retryable ? { Task { await feed.summarize(entry.id) } } : nil,
-                    action: failure.code == "llm_not_configured"
-                        ? .init(label: "Open Settings") { navigation.open(.settings, compact: !usesSplitLayout) }
-                        : nil
+                    action: failureAction(for: failure)
                 )
             }
 
@@ -187,7 +219,11 @@ struct EntryExpandedBody: View {
                 }
             }
 
-            HStack {
+            HStack(spacing: 14) {
+                // Reads whatever the card is showing: the AI summary, else the fallback body.
+                if let script = readAloudScript {
+                    ReadAloudButton(id: entry.id, text: script)
+                }
                 Button("Full article ↗") { onOpenDetail(entry.id) }
                     .buttonStyle(.plain)
                     .foregroundStyle(Color.vermilion)
@@ -202,6 +238,34 @@ struct EntryExpandedBody: View {
         .task(id: fallbackTrigger) {
             if shouldLoadFallback { await feed.loadFallbackBody(entry.id) }
         }
+    }
+
+    /// A second affordance next to the error, chosen by the failure code: missing provider →
+    /// Settings; an on-device (experimental) failure → turn Apple Intelligence off here and
+    /// summarize again with the cloud provider.
+    private func failureAction(for failure: FeedStore.SummaryFailure) -> ErrorBanner.Action? {
+        switch failure.code {
+        case "llm_not_configured":
+            return .init(label: "Open Settings") { navigation.open(.settings, compact: !usesSplitLayout) }
+        case "on_device_refused", "on_device_failed":
+            guard preferences.onDevice else { return nil }
+            return .init(label: "Turn off Apple Intelligence") {
+                preferences.onDevice = false
+                Task { await feed.summarize(entry.id) }
+            }
+        default:
+            return nil
+        }
+    }
+
+    private var readAloudScript: String? {
+        if let summary = entry.summary {
+            return ReadAloudScript.summary(title: entry.title, intro: summary.intro, bullets: summary.bullets)
+        }
+        if let fallback, !fallback.isEmpty {
+            return ReadAloudScript.article(title: entry.title, body: fallback)
+        }
+        return nil
     }
 
     /// Re-evaluates the fallback fetch whenever the inputs to `shouldLoadFallback` change.

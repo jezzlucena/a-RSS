@@ -1,7 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Mirrors apps/web/src/pages/Sources.tsx: add form, OPML import/export, and the editable list.
+/// Mirrors apps/web/src/pages/Sources.tsx: add form, the editable list, then OPML import/export
+/// at the bottom (an occasional task, kept out of the way of the list).
 struct SourcesView: View {
     @Environment(SourcesStore.self) private var sources
     @Environment(ToastCenter.self) private var toasts
@@ -49,6 +50,19 @@ struct SourcesView: View {
             }
 
             Section {
+                if sources.hasLoaded, sources.sources.isEmpty {
+                    Text("No sources yet. Add a feed URL above or import OPML.")
+                        .font(.bodySerif.italic())
+                        .foregroundStyle(Color.muted)
+                }
+                ForEach(sources.sources) { source in
+                    SourceRow(source: source)
+                }
+            } header: {
+                KickerText("Sources")
+            }
+
+            Section {
                 Button("Import OPML…", systemImage: "square.and.arrow.down") { showImporter = true }
                     .disabled(importing)
                 Button("Export OPML", systemImage: "square.and.arrow.up") { Task { await exportOPML() } }
@@ -65,19 +79,6 @@ struct SourcesView: View {
                 KickerText("OPML")
             } footer: {
                 Text("Paywall bypass uses public archives and crawler user-agents and may violate some publishers' Terms of Service. Set a source to *Bypass off* to fetch it normally.")
-            }
-
-            Section {
-                if sources.hasLoaded, sources.sources.isEmpty {
-                    Text("No sources yet. Add a feed URL above or import OPML.")
-                        .font(.bodySerif.italic())
-                        .foregroundStyle(Color.muted)
-                }
-                ForEach(sources.sources) { source in
-                    SourceRow(source: source)
-                }
-            } header: {
-                KickerText("Sources")
             }
         }
         .scrollContentBackground(.hidden)

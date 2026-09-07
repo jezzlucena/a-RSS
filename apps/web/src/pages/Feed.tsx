@@ -4,6 +4,8 @@ import { useFeedStore } from '@/stores/feed';
 import { useSourcesStore } from '@/stores/sources';
 import { useAuthStore, activeLlmProvider } from '@/stores/auth';
 import { timeAgo } from '@/lib/timeAgo';
+import { articleScript, summaryScript } from '@/lib/readAloud';
+import { ReadAloudButton } from '@/components/ReadAloudButton';
 import { api, type ApiError } from '@/lib/api';
 import type { Entry, EntryDetail, FeedView } from '@a-rss/shared';
 
@@ -369,6 +371,7 @@ function EntryCard({
   const summarizeEntry = useFeedStore((s) => s.summarizeEntry);
   const toggleRead = useFeedStore((s) => s.toggleRead);
   const retryEntry = useFeedStore((s) => s.retryEntry);
+  const dismissEntry = useFeedStore((s) => s.dismissEntry);
   const [summarizing, setSummarizing] = useState(false);
   const [summarizeError, setSummarizeError] = useState<{
     message: string;
@@ -507,6 +510,14 @@ function EntryCard({
                 title="Re-fetch this article"
               >
                 <span aria-hidden>↻</span> Retry
+              </button>
+              <button
+                type="button"
+                onClick={() => void dismissEntry(entry.id)}
+                className="ml-3 inline-flex items-center gap-1 text-muted underline underline-offset-[3px] hover:no-underline hover:text-ink focus:no-underline focus:text-ink"
+                title="Hide this article for good"
+              >
+                <span aria-hidden>×</span> Dismiss
               </button>
             </>
           )}
@@ -661,6 +672,18 @@ function EntryCard({
           )}
 
           <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2">
+            {/* Reads whatever the card is showing: the AI summary, else the fallback body. */}
+            {(entry.summary || fallbackText) && (
+              <ReadAloudButton
+                id={entry.id}
+                text={
+                  entry.summary
+                    ? summaryScript(entry.title, entry.summary.intro, entry.summary.bullets)
+                    : articleScript(entry.title, fallbackText ?? '')
+                }
+                className="inline-flex items-center gap-2 border border-ink px-3 py-1.5 font-mono text-chip uppercase text-ink transition-colors hover:bg-ink hover:text-paper aria-pressed:border-vermilion aria-pressed:text-vermilion aria-pressed:hover:bg-vermilion aria-pressed:hover:text-paper"
+              />
+            )}
             <Link
               to={`/entries/${entry.id}`}
               className="inline-flex items-center gap-2 font-mono text-chip uppercase text-ink transition-colors hover:text-vermilion focus:text-vermilion"

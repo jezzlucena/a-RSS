@@ -321,4 +321,17 @@ struct FeedStoreTests {
         await store.loadFallbackBody("a")
         #expect(api.detailCalls == ["a"], "never retried in a loop")
     }
+
+    @Test func dismissRemovesTheEntryAndAdjustsTheUnreadCount() async {
+        let api = FakeARSSAPI()
+        api.feedPages = [Make.page([Make.entry("a"), Make.entry("b")], unread: 2)]
+        let (store, _) = makeStore(api)
+        await store.loadInitial()
+
+        await store.dismissEntry("a")
+        #expect(api.dismissCalls == ["a"])
+        #expect(store.entries.map(\.id) == ["b"])
+        #expect(store.unreadCount == 1)
+    }
 }
+

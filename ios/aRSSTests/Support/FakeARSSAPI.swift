@@ -35,6 +35,7 @@ final class FakeARSSAPI: ARSSAPI {
     var readCalls: [(id: String, read: Bool)] = []
     var retryError: APIError?
     var retryCalls: [String] = []
+    var dismissCalls: [String] = []
     var summarizeResults: [String: Result<SummarizeResponse, APIError>] = [:]
     var summarizeCalls: [String] = []
     var uploadSummaryCalls: [(id: String, request: ClientSummaryRequest)] = []
@@ -120,7 +121,9 @@ final class FakeARSSAPI: ARSSAPI {
         return SummarizeResponse(summary: summary, processingState: .summarized)
     }
 
-    @MainActor func failures() async throws -> [FailedEntry] { [] }
+    @MainActor func dismissEntry(id: String) async throws { dismissCalls.append(id) }
+
+    @MainActor func failures(cursor: String?) async throws -> FailuresResponse { FailuresResponse(items: [], nextCursor: nil) }
 
     @MainActor func sources() async throws -> [Source] { try sourcesResult.get() }
 

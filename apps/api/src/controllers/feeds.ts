@@ -144,6 +144,7 @@ export const getUnreadCounts: RequestHandler = async (req, res) => {
     {
       $match: {
         userId: userObjId,
+        dismissedAt: null,
         ...(readEntryIds.length > 0 ? { _id: { $nin: readEntryIds } } : {}),
       },
     },

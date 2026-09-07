@@ -26,7 +26,11 @@ settings:
     # `nonisolated` so decoding can run inside the APIClient actor.
     SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
     SWIFT_APPROACHABLE_CONCURRENCY: YES
-    TARGETED_DEVICE_FAMILY: "1,2"
+    # iPhone, iPad, and Mac (Catalyst). "Designed for iPad" is off so the Mac destination is
+    # always the Catalyst build with its own entitlements.
+    TARGETED_DEVICE_FAMILY: "1,2,6"
+    SUPPORTS_MACCATALYST: YES
+    SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
     CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER: NO
@@ -47,6 +51,7 @@ targets:
       path: aRSS/Info.plist
       properties:
         CFBundleDisplayName: a-RSS
+        LSApplicationCategoryType: public.app-category.news
         CFBundleShortVersionString: "0.2.0"
         CFBundleVersion: "1"
         UILaunchScreen: {}
@@ -84,6 +89,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.arss.app
         # ARSS_API_BASE_URL, GOOGLE_CLIENT_ID, GOOGLE_REVERSED_CLIENT_ID: see Defaults.xcconfig.
+        # The Mac build is sandboxed and needs the network-client entitlement; iOS uses aRSS.entitlements.
+        "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": aRSS/aRSS-macCatalyst.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         DEVELOPMENT_ASSET_PATHS: "\"aRSS/Preview Content\""
@@ -99,6 +106,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.arss.app.tests
         GENERATE_INFOPLIST_FILE: YES
+        # XcodeGen's iOS unit-test preset signs the Mac Catalyst build "Sign to Run Locally"
+        # (ad-hoc); the host app is team-signed, so macOS refuses to load the bundle
+        # ("different Team IDs"). Sign both with the same development identity.
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development"
 
   # End-to-end smoke test against a running API (skips itself when SMOKE_EMAIL is unset).
   # Run: TEST_RUNNER_SMOKE_EMAIL=… TEST_RUNNER_SMOKE_PASSWORD=… xcodebuild test -only-testing:aRSSUITests …
@@ -116,10 +127,14 @@ targets:
         TEST_TARGET_NAME: aRSS
         # XCTestCase subclasses must stay nonisolated (XCTest's initializers are).
         SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development"
 
 schemes:
   aRSS:
     build:
+      # Serial: with parallel builds the Catalyst test bundle can be embedded in the app before
+      # it is signed, and the app's own CodeSign then fails ("code object is not signed at all").
+      parallelizeBuild: false
       targets:
         aRSS: all
         aRSSTests: [test]

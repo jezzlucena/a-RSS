@@ -12,6 +12,14 @@ struct FeedView: View {
 
     @State private var showScopePicker = false
     @State private var detailID: String?
+    /// Mac overscroll trigger: re-armed once the content settles back below the threshold.
+    @State private var pullArmed = true
+
+    private struct ScrollSignals: Equatable {
+        var nearEnd: Bool
+        var pulledPastTop: Bool
+    }
+    private static let pullThreshold: CGFloat = 70
 
     private var isCompact: Bool { !usesSplitLayout }
 
@@ -19,7 +27,11 @@ struct FeedView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
-                    FeedMasthead().id("top")
+                    if isCompact {
+                        FeedMasthead().id("top")
+                    } else {
+                        Color.clear.frame(height: 1).id("top")
+                    }
 
                     if let error = feed.error {
                         ErrorBanner(message: error) { Task { await feed.loadInitial() } }
@@ -52,16 +64,31 @@ struct FeedView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 40)
-                .frame(maxWidth: 720)
                 .frame(maxWidth: .infinity)
             }
             .scrollDismissesKeyboard(.immediately)
-            .refreshable { await feed.reload() }
-            // Web: an IntersectionObserver with rootMargin 200px; load when within 200pt of the end.
-            .onScrollGeometryChange(for: Bool.self) { geometry in
-                geometry.contentOffset.y + geometry.containerSize.height >= geometry.contentSize.height - 200
-            } action: { _, nearEnd in
-                if nearEnd { Task { await feed.loadMore() } }
+            // Pull-to-refresh does what the Fetch button does: poll the sources, then reload.
+            .refreshable { await feed.pollFeed() }
+            .onScrollGeometryChange(for: ScrollSignals.self) { geometry in
+                ScrollSignals(
+                    // Web: an IntersectionObserver with rootMargin 200px; load when within 200pt of the end.
+                    nearEnd: geometry.contentOffset.y + geometry.containerSize.height >= geometry.contentSize.height - 200,
+                    // Rubber-banding above the top (negative offset past the inset).
+                    pulledPastTop: geometry.contentOffset.y + geometry.contentInsets.top < -Self.pullThreshold
+                )
+            } action: { _, signals in
+                if signals.nearEnd { Task { await feed.loadMore() } }
+                #if targetEnvironment(macCatalyst)
+                // No UIRefreshControl on the Mac: a trackpad overscroll past the top is the pull.
+                if signals.pulledPastTop {
+                    if pullArmed {
+                        pullArmed = false
+                        Task { await feed.pollFeed() }
+                    }
+                } else {
+                    pullArmed = true
+                }
+                #endif
             }
             .onChange(of: feed.scrollRequest) { _, request in
                 guard let request else { return }
@@ -82,7 +109,7 @@ struct FeedView: View {
             }
         }
         .animation(.snappy, value: feed.pendingEntries.isEmpty)
-        .navigationBarTitleDisplayMode(.inline)
+        .modifier(FeedChrome())
         .toolbar { toolbar }
         .navigationDestination(item: $detailID) { id in EntryDetailView(id: id) }
         .sheet(isPresented: $showScopePicker) { ScopePickerSheet() }
@@ -96,16 +123,29 @@ struct FeedView: View {
         .onKeyPress(characters: CharacterSet(charactersIn: "jkmfo"), phases: .down) { press in
             handleKey(press)
         }
+        // ⌘R fetches new stories (the Mac toolbar's Fetch item is a hosted view and can't own
+        // a keyboard shortcut of its own).
+        .onKeyPress(characters: CharacterSet(charactersIn: "r"), phases: .down) { press in
+            guard press.modifiers.contains(.command) else { return .ignored }
+            Task { await feed.pollFeed() }
+            return .handled
+        }
     }
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
+        #if !targetEnvironment(macCatalyst)
         ToolbarItem(placement: .principal) {
             FeedTitle(title: sources.title(for: feed.scope), unreadCount: feed.unreadCount)
         }
         if isCompact {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Choose feed", systemImage: "line.3.horizontal.decrease") { showScopePicker = true }
+            }
+        } else {
+            // Split layouts have a wide title bar: the filter and order controls live there.
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                FeedControls()
             }
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
@@ -118,6 +158,7 @@ struct FeedView: View {
                     Image(systemName: "arrow.clockwise")
                 }
             }
+            .keyboardShortcut("r", modifiers: .command)
             .accessibilityLabel(feed.polling ? "Fetching new stories…" : "Fetch new stories")
             .help("Trigger a poll cycle for this view's sources")
             .disabled(feed.polling || feed.loading)
@@ -130,6 +171,10 @@ struct FeedView: View {
                 }
             }
         }
+        #else
+        // Every control lives in the window's title-bar toolbar (MacToolbar); a builder can't be empty.
+        ToolbarItem(placement: .topBarTrailing) { EmptyView() }
+        #endif
     }
 
     /// Web: `setInterval` 60 s while the tab is visible, plus an immediate refresh on refocus.
@@ -188,32 +233,56 @@ struct FeedTitle: View {
     }
 }
 
-/// The filter/order controls under the navigation bar (the web masthead minus its title,
-/// which now lives in the bar).
-struct FeedMasthead: View {
+/// On the Mac the window's title-bar toolbar (MacToolbar) owns the title, subtitle and every
+/// control, so the feed root shows no in-content navigation bar. Elsewhere the bar stays.
+struct FeedChrome: ViewModifier {
+    func body(content: Content) -> some View {
+        #if targetEnvironment(macCatalyst)
+        content.toolbar(.hidden, for: .navigationBar)
+        #else
+        content.navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+/// The All/Unread picker and the order toggle. In compact layouts they sit in the masthead
+/// under the navigation bar; in split layouts they move into the (wider) title bar.
+struct FeedControls: View {
     @Environment(FeedStore.self) private var feed
 
     var body: some View {
+        Picker("Filter entries", selection: Binding(
+            get: { feed.filter },
+            set: { filter in Task { await feed.setFilter(filter) } }
+        )) {
+            ForEach(FeedStore.Filter.allCases) { Text($0.label).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 160)
+
+        Picker("Order", selection: Binding(
+            get: { feed.order },
+            set: { order in Task { await feed.setOrder(order) } }
+        )) {
+            Text("New").tag(FeedOrder.desc)
+            Text("Old").tag(FeedOrder.asc)
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 120)
+        .accessibilityLabel("Sort order")
+    }
+}
+
+/// Compact layouts only: the controls row under the navigation bar (the web masthead minus its
+/// title, which lives in the bar).
+struct FeedMasthead: View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Picker("Filter entries", selection: Binding(
-                    get: { feed.filter },
-                    set: { filter in Task { await feed.setFilter(filter) } }
-                )) {
-                    ForEach(FeedStore.Filter.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 200)
+                FeedControls()
                 Spacer()
-                Button {
-                    Task { await feed.toggleOrder() }
-                } label: {
-                    Label(feed.order == .desc ? "New" : "Old", systemImage: "arrow.up")
-                        .font(.chip)
-                }
-                .buttonStyle(.bordered)
-                .accessibilityLabel(feed.order == .desc ? "Sorted newest first — switch to oldest first" : "Sorted oldest first — switch to newest first")
             }
+            .buttonStyle(.bordered)
             Rectangle().fill(Color.ink).frame(height: 2)
         }
         .padding(.top, 8)

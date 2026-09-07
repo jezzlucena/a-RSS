@@ -3,6 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { EntryDetail, EntrySummary, ProcessingState } from '@a-rss/shared';
 import { api } from '@/lib/api';
 import { timeAgo } from '@/lib/timeAgo';
+import { articleScript, summaryScript } from '@/lib/readAloud';
+import { ReadAloudButton } from '@/components/ReadAloudButton';
 import { useAuthStore, activeLlmProvider } from '@/stores/auth';
 
 export default function EntryDetailPage() {
@@ -209,15 +211,29 @@ export default function EntryDetailPage() {
       )}
 
       {/* External source */}
-      <footer className="mt-14 flex items-center justify-between border-t border-rule pt-6">
-        <a
-          href={entry.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="border border-ink px-5 py-3 font-mono text-chip uppercase text-ink transition-colors hover:bg-ink hover:text-paper"
-        >
-          Open at source ↗
-        </a>
+      <footer className="mt-14 flex flex-wrap items-center justify-between gap-4 border-t border-rule pt-6">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* The page shows the full article, so that's what gets read; the summary only when no body was extracted. */}
+          {(articleText || entry.summary) && (
+            <ReadAloudButton
+              id={`detail:${entry.id}`}
+              text={
+                articleText
+                  ? articleScript(entry.title, articleText)
+                  : summaryScript(entry.title, entry.summary?.intro, entry.summary?.bullets ?? [])
+              }
+              className="inline-flex items-center gap-2 border border-ink px-5 py-3 font-mono text-chip uppercase text-ink transition-colors hover:bg-ink hover:text-paper aria-pressed:border-vermilion aria-pressed:text-vermilion aria-pressed:hover:bg-vermilion aria-pressed:hover:text-paper"
+            />
+          )}
+          <a
+            href={entry.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="border border-ink px-5 py-3 font-mono text-chip uppercase text-ink transition-colors hover:bg-ink hover:text-paper"
+          >
+            Open at source ↗
+          </a>
+        </div>
         <span className="font-mono text-chip uppercase text-muted">
           {entry.summary?.model ?? entry.processingState}
         </span>

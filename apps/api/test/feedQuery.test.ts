@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { decodeCursorParts } from '../src/services/feedQuery.js';
 import mongoose from 'mongoose';
 import { encodeCursor, decodeCursor } from '../src/services/feedQuery.js';
 
@@ -42,5 +43,18 @@ describe('feed cursor', () => {
 
   it('rejects malformed cursors', () => {
     expect(() => decodeCursor('not-a-cursor', 'desc')).toThrow();
+  });
+});
+
+describe('decodeCursorParts', () => {
+  it('round-trips an encoded (date, id) pair and rejects garbage', () => {
+    const id = new (require('mongoose').Types.ObjectId)();
+    const date = new Date('2026-09-06T12:00:00.000Z');
+    const cursor = Buffer.from(`${date.toISOString()}|${id.toHexString()}`).toString('base64url');
+    const parts = decodeCursorParts(cursor);
+    expect(parts.publishedAt.toISOString()).toBe(date.toISOString());
+    expect(parts.id.equals(id)).toBe(true);
+    expect(() => decodeCursorParts('not-a-cursor')).toThrow();
+    expect(() => decodeCursorParts(Buffer.from('nope|abc').toString('base64url'))).toThrow();
   });
 });

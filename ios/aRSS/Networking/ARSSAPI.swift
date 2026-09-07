@@ -30,9 +30,10 @@ nonisolated protocol ARSSAPI: Sendable {
     func entryDetail(id: String) async throws -> EntryDetail
     func setEntryRead(id: String, read: Bool) async throws -> Bool
     func retryEntry(id: String) async throws
+    func dismissEntry(id: String) async throws
     func summarize(id: String) async throws -> SummarizeResponse
     func uploadSummary(id: String, _ request: ClientSummaryRequest) async throws -> SummarizeResponse
-    func failures() async throws -> [FailedEntry]
+    func failures(cursor: String?) async throws -> FailuresResponse
 
     // Sources
     func sources() async throws -> [Source]
@@ -91,11 +92,11 @@ nonisolated final class LiveARSSAPI: ARSSAPI {
         return response.isRead
     }
     func retryEntry(id: String) async throws { try await client.send(Endpoints.retryEntry(id: id)) }
+    func dismissEntry(id: String) async throws { try await client.send(Endpoints.dismissEntry(id: id)) }
     func summarize(id: String) async throws -> SummarizeResponse { try await client.send(Endpoints.summarize(id: id)) }
     func uploadSummary(id: String, _ request: ClientSummaryRequest) async throws -> SummarizeResponse { try await client.send(Endpoints.uploadSummary(id: id, request)) }
-    func failures() async throws -> [FailedEntry] {
-        let response: FailuresResponse = try await client.send(Endpoints.failures)
-        return response.items
+    func failures(cursor: String?) async throws -> FailuresResponse {
+        try await client.send(Endpoints.failures(cursor: cursor))
     }
 
     func sources() async throws -> [Source] { try await client.send(Endpoints.sources) }

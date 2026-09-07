@@ -33,4 +33,6 @@ nonisolated struct FailedEntry: Decodable, Sendable, Hashable, Identifiable {
 
 nonisolated struct FailuresResponse: Decodable, Sendable {
     var items: [FailedEntry]
+    /// Pass back verbatim for the next page; nil on the last one.
+    var nextCursor: String?
 }

@@ -34,4 +34,21 @@ final class AppNavigation {
     func showFeed(compact: Bool) {
         if compact { tab = .feed } else { detailPath = [] }
     }
+
+    /// The wordmark: back to the All Sources feed, closing Settings or an open article.
+    func goHome(feed: FeedStore, compact: Bool) {
+        showFeed(compact: compact)
+        feed.select(.all)
+    }
+
+    /// The gear button and ⌘, work as a toggle: open Settings, or close it if it's showing.
+    func toggleSettings(compact: Bool) {
+        if compact {
+            tab = tab == .settings ? .feed : .settings
+        } else if detailPath.last == .settings {
+            detailPath.removeLast()
+        } else {
+            detailPath = [.settings]
+        }
+    }
 }

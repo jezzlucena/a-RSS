@@ -54,6 +54,10 @@ interface FeedState {
   clearManualUnread: (id: string) => void;
   /** Re-enqueue the fetch + image pipeline for a failed entry. */
   retryEntry: (id: string) => Promise<void>;
+  /** Hide a failed entry for good (server-side `dismissedAt`); it leaves the list at once. */
+  dismissEntry: (id: string) => Promise<void>;
+  /** Drop an entry from the local list (e.g. dismissed from Settings) and fix the counts. */
+  removeEntry: (id: string) => void;
   /** Trigger a poll cycle for the sources matching the current view, then reload. */
   pollFeed: () => Promise<void>;
   /** True while pollFeed is awaiting agenda jobs to settle. */
@@ -255,6 +259,29 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Retry failed');
     }
+  },
+
+  dismissEntry: async (id) => {
+    try {
+      await api(`/entries/${id}/dismiss`, { method: 'POST' });
+      get().removeEntry(id);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not dismiss the article');
+    }
+  },
+
+  removeEntry: (id) => {
+    const entry = get().entries.find((e) => e.id === id);
+    const wasUnreadPending = get().pendingEntries.some((e) => e.id === id && !e.isRead);
+    set({
+      entries: get().entries.filter((e) => e.id !== id),
+      pendingEntries: get().pendingEntries.filter((e) => e.id !== id),
+      unreadCount: Math.max(
+        0,
+        get().unreadCount - ((entry && !entry.isRead) || wasUnreadPending ? 1 : 0),
+      ),
+    });
+    refreshSidebarCounts();
   },
 
   summarizeEntry: async (id) => {

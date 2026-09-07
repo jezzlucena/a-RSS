@@ -4,6 +4,7 @@ import {
   listFailures,
   getEntry,
   retryEntry,
+  dismissEntry,
   setEntryRead,
   summarizeEntry,
   putEntrySummary,
@@ -15,6 +16,7 @@ router.use(requireAuth);
 router.get('/failures', listFailures);
 router.get('/:id', getEntry);
 router.post('/:id/retry', retryEntry);
+router.post('/:id/dismiss', dismissEntry);
 router.post('/:id/read', setEntryRead);
 router.post('/:id/summarize', summarizeEntry);
 router.put('/:id/summary', putEntrySummary);

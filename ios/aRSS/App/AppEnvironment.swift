@@ -13,6 +13,9 @@ final class AppEnvironment {
     let feed: FeedStore
     let summarizationPreferences: SummarizationPreferences
     let summarizer: SummarizationService
+    let navigation = AppNavigation()
+    let speech = SpeechReader()
+    let layoutMetrics = LayoutMetrics()
 
     init(api: any ARSSAPI, onDeviceEngine: any OnDeviceSummarizing) {
         self.api = api

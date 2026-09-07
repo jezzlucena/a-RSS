@@ -18,6 +18,9 @@ nonisolated enum RefreshCookieVault {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
+            // Mac Catalyst: use the iOS-style (data protection) keychain rather than the legacy
+            // login keychain, so `kSecAttrAccessible` applies. Ignored on iOS.
+            kSecUseDataProtectionKeychain as String: true,
         ]
     }
 

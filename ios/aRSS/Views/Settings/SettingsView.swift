@@ -17,7 +17,12 @@ struct SettingsView: View {
                     }
                     LabeledContent("Sign-in", value: me.authMethods.filter { $0 != .unknown }.map(\.rawValue).joined(separator: " · "))
                 }
-                Button("Sign out", role: .destructive) { Task { await auth.logout() } }
+                Button(role: .destructive) {
+                    Task { await auth.logout() }
+                } label: {
+                    Text("Sign out").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
             } header: {
                 KickerText("Account")
             }
@@ -66,7 +71,12 @@ struct AIProviderSection: View {
                     set: { id in Task { await select(id) } }
                 )) {
                     ForEach(llm.providers.filter { $0.id != .unknown }) { p in
-                        Text(p.configured ? "\(p.label) · configured" : p.label).tag(p.id)
+                        // A filled check marks providers that already have credentials; the menu's
+                        // own plain checkmark still marks the selected one.
+                        (p.configured
+                            ? Text("\(p.label) \(Image(systemName: "checkmark.circle.fill"))")
+                            : Text(p.label))
+                            .tag(p.id)
                     }
                 }
                 .disabled(saving)
@@ -97,11 +107,25 @@ struct AIProviderSection: View {
                     ErrorBanner(message: error)
                 }
 
-                Button(saving ? "Saving…" : "Save") { Task { await save(provider) } }
-                    .disabled(!canSave(provider))
-                if provider.configured {
-                    Button("Remove key", role: .destructive) { Task { await remove(provider) } }
+                // Real buttons (like "Add feed" in Sources), side by side: Clear (only when a key
+                // is stored) on the left, the primary Save on the right.
+                HStack(spacing: 12) {
+                    if provider.configured {
+                        Button(role: .destructive) {
+                            Task { await remove(provider) }
+                        } label: {
+                            Text("Clear").frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.glass)
                         .disabled(saving)
+                    }
+                    Button {
+                        Task { await save(provider) }
+                    } label: {
+                        Text(saving ? "Saving…" : "Save").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .disabled(!canSave(provider))
                 }
             }
         } header: {
@@ -211,8 +235,13 @@ struct OnDeviceSection: View {
     var body: some View {
         @Bindable var preferences = preferences
         Section {
-            Toggle("Summarize with Apple Intelligence", isOn: $preferences.onDevice)
-                .disabled(summarizer.onDeviceAvailability != .available)
+            Toggle(isOn: $preferences.onDevice) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Summarize with Apple Intelligence")
+                    ExperimentalBadge()
+                }
+            }
+            .disabled(summarizer.onDeviceAvailability != .available)
         } header: {
             KickerText("On this device")
         } footer: {
@@ -221,11 +250,26 @@ struct OnDeviceSection: View {
     }
 
     private var footer: String {
-        var text = "Summaries made here are uploaded to your account so they also appear on the web and your other devices. Your cloud provider is still used from the web."
+        var text = "Experimental: the on-device model has a small context window and stricter content rules, so some articles may fail or be refused; when that happens the feed offers to turn this off. Summaries made here are uploaded to your account so they also appear on the web and your other devices. Your cloud provider is still used from the web."
         if case .unavailable(let reason) = summarizer.onDeviceAvailability {
             text = reason + " " + text
         }
         return text
+    }
+}
+
+/// Small vermilion capsule marking a setting as experimental.
+struct ExperimentalBadge: View {
+    var body: some View {
+        Text("Experimental")
+            .font(.kicker)
+            .kerning(0.8)
+            .textCase(.uppercase)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Color.vermilion.opacity(0.14), in: Capsule())
+            .foregroundStyle(Color.vermilionDeep)
+            .accessibilityLabel("Experimental")
     }
 }
 
@@ -257,9 +301,13 @@ struct PasswordSection: View {
             if let error {
                 ErrorBanner(message: error)
             }
-            Button(saving ? "Saving…" : (hasPassword ? "Update password" : "Set password")) {
+            Button {
                 Task { await submit() }
+            } label: {
+                Text(saving ? "Saving…" : (hasPassword ? "Update password" : "Set password"))
+                    .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.glassProminent)
             .disabled(saving || newPassword.isEmpty || confirmPassword.isEmpty || (hasPassword && currentPassword.isEmpty))
         } header: {
             KickerText(hasPassword ? "Change password" : "Set a password")
@@ -299,41 +347,64 @@ struct PasswordSection: View {
 struct DiagnosticsSection: View {
     @Environment(AppEnvironment.self) private var environment
 
+    @State private var expanded = false
     @State private var failures: [FailedEntry]?
+    @State private var nextCursor: String?
     @State private var loading = false
     @State private var retrying: String?
+    @State private var dismissing: String?
     @State private var error: String?
 
     var body: some View {
         Section {
-            if loading, failures == nil {
-                ProgressView().tint(.vermilion)
-            }
-            if let failures {
-                if failures.isEmpty {
-                    Text("All clear — nothing failed recently.")
-                        .font(.bodySerif.italic())
-                        .foregroundStyle(Color.muted)
+            // Collapsed by default; the first page loads when the user opens it.
+            DisclosureGroup(isExpanded: $expanded) {
+                if loading, failures == nil {
+                    ProgressView().tint(.vermilion)
                 }
-                ForEach(failures) { failure in
-                    row(failure)
+                if let failures {
+                    if failures.isEmpty {
+                        Text("All clear — nothing failed recently.")
+                            .font(.bodySerif.italic())
+                            .foregroundStyle(Color.muted)
+                    }
+                    ForEach(failures) { failure in
+                        row(failure)
+                    }
+                    if nextCursor != nil {
+                        Button {
+                            Task { await loadMore() }
+                        } label: {
+                            Text(loading ? "Loading…" : "Load more").frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.glass)
+                        .disabled(loading)
+                    }
+                }
+                if let error {
+                    ErrorBanner(message: error) { Task { await load(reset: failures == nil) } }
+                }
+            } label: {
+                HStack {
+                    Text("Recent processing failures")
+                    Spacer()
+                    if expanded {
+                        Button(loading ? "Loading…" : "Refresh") { Task { await load(reset: true) } }
+                            .font(.chip)
+                            .buttonStyle(.plain)
+                            .foregroundStyle(Color.vermilion)
+                            .disabled(loading)
+                    }
                 }
             }
-            if let error {
-                ErrorBanner(message: error)
+            .onChange(of: expanded) { _, isOpen in
+                if isOpen, failures == nil, !loading { Task { await load(reset: true) } }
             }
         } header: {
-            HStack {
-                KickerText("Diagnostics · Recent processing failures")
-                Spacer()
-                Button(loading ? "Loading…" : "Refresh") { Task { await load() } }
-                    .font(.chip)
-                    .disabled(loading)
-            }
+            KickerText("Diagnostics")
         } footer: {
-            Text("Entries the summarizer couldn't fetch or summarize. Common causes: hard paywalls, blocked archives, transient network errors.")
+            Text("Entries the summarizer couldn't fetch or summarize. Common causes: hard paywalls, blocked archives, transient network errors. Retry re-fetches; Dismiss hides the article for good.")
         }
-        .task { await load() }
     }
 
     private func row(_ failure: FailedEntry) -> some View {
@@ -355,22 +426,53 @@ struct DiagnosticsSection: View {
                     .foregroundStyle(Color.vermilionDeep)
                     .lineLimit(3)
             }
-            Button(retrying == failure.id ? "Retrying…" : "Retry") { Task { await retry(failure.id) } }
-                .font(.chip)
-                .disabled(retrying != nil)
+            HStack(spacing: 12) {
+                Button(retrying == failure.id ? "Retrying…" : "Retry") { Task { await retry(failure.id) } }
+                    .buttonStyle(.glassProminent)
+                    .disabled(retrying != nil || dismissing != nil)
+                Button(dismissing == failure.id ? "Dismissing…" : "Dismiss", role: .destructive) { Task { await dismiss(failure.id) } }
+                    .buttonStyle(.glass)
+                    .disabled(retrying != nil || dismissing != nil)
+            }
+            .controlSize(.small)
+            .font(.chip)
+            .padding(.top, 2)
         }
         .padding(.vertical, 4)
+        .swipeActions(edge: .trailing) {
+            Button("Dismiss", systemImage: "xmark", role: .destructive) { Task { await dismiss(failure.id) } }
+            Button("Retry", systemImage: "arrow.clockwise") { Task { await retry(failure.id) } }.tint(.ink)
+        }
     }
 
-    private func load() async {
+    /// First page (or a refresh): replaces the list.
+    private func load(reset: Bool) async {
         loading = true
         error = nil
         defer { loading = false }
         do {
-            failures = try await environment.api.failures()
+            let page = try await environment.api.failures(cursor: nil)
+            failures = page.items
+            nextCursor = page.nextCursor
         } catch {
             environment.auth.noteError(error)
+            if reset { failures = nil }
             self.error = error.userMessage(fallback: "Could not load failures")
+        }
+    }
+
+    private func loadMore() async {
+        guard let cursor = nextCursor, !loading else { return }
+        loading = true
+        error = nil
+        defer { loading = false }
+        do {
+            let page = try await environment.api.failures(cursor: cursor)
+            failures = (failures ?? []) + page.items
+            nextCursor = page.nextCursor
+        } catch {
+            environment.auth.noteError(error)
+            self.error = error.userMessage(fallback: "Could not load more failures")
         }
     }
 
@@ -383,6 +485,21 @@ struct DiagnosticsSection: View {
             failures?.removeAll { $0.id == id }
         } catch {
             self.error = error.userMessage(fallback: "Retry failed")
+        }
+    }
+
+    private func dismiss(_ id: String) async {
+        dismissing = id
+        error = nil
+        defer { dismissing = nil }
+        do {
+            try await environment.api.dismissEntry(id: id)
+            failures?.removeAll { $0.id == id }
+            // The dismissed article also leaves the feed and the counts.
+            await environment.feed.reload()
+            await environment.sources.refreshUnreadCounts()
+        } catch {
+            self.error = error.userMessage(fallback: "Could not dismiss the article")
         }
     }
 }

@@ -104,7 +104,12 @@ final class FeedStore {
     }
 
     func toggleOrder() async {
-        setScope(scope, order: order == .desc ? .asc : .desc)
+        await setOrder(order == .desc ? .asc : .desc)
+    }
+
+    func setOrder(_ order: FeedOrder) async {
+        guard order != self.order else { return }
+        setScope(scope, order: order)
         await loadInitial()
     }
 
@@ -218,6 +223,7 @@ final class FeedStore {
     /// The Fetch button: ask the server to poll this view's sources, give Agenda a moment, then
     /// reload page 1 outright (replacing the list and dropping any pending entries).
     func pollFeed() async {
+        guard !polling else { return }
         polling = true
         error = nil
         defer { polling = false }
@@ -318,6 +324,22 @@ final class FeedStore {
         } catch {
             auth.noteError(error)
             toasts.report(error, fallback: "Retry failed")
+        }
+    }
+
+    /// Hides a failed article for good (server-side `dismissedAt`); it leaves the list at once.
+    func dismissEntry(_ id: String) async {
+        do {
+            try await api.dismissEntry(id: id)
+            if let index = entries.firstIndex(where: { $0.id == id }) {
+                if !entries[index].isRead { unreadCount = max(0, unreadCount - 1) }
+                if expandedID == id { expandedID = nil }
+                entries.remove(at: index)
+            }
+            Task { await sources.refreshUnreadCounts() }
+        } catch {
+            auth.noteError(error)
+            toasts.report(error, fallback: "Could not dismiss the article")
         }
     }
 

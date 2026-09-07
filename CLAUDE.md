@@ -26,8 +26,9 @@ the `HttpError`/`errorHandler` pair. `config/env.ts` is the only file that reads
 `process.env`.
 
 `apps/web/src`: `pages/` (one default-exported component per route), `components/`
-(only Layout, RequireAuth, GoogleButton — named exports), `stores/` (Zustand),
-`lib/` (`api.ts` fetch client, `timeAgo.ts`), `styles/index.css` (palette tokens).
+(only Layout, RequireAuth, GoogleButton, ReadAloudButton — named exports), `stores/` (Zustand),
+`lib/` (`api.ts` fetch client, `timeAgo.ts`, `readAloud.ts` speech synthesis), `styles/index.css`
+(palette tokens).
 Sub-components used by exactly one page live at the bottom of that page's file.
 
 ## Running it — Docker is the default
@@ -178,6 +179,14 @@ is the only place a Mongoose doc becomes an API shape; add fields there, not ad 
   path: a client-produced summary (iOS on-device Apple Foundation Models), stored once and
   never overwritten.
 - `POST /entries/:id/retry` resets to `pending`.
+- `POST /entries/:id/dismiss` sets `dismissedAt`. The document stays (deleting it would let
+  the next poll's upsert resurrect the article) but it leaves the feed, the unread counts
+  and diagnostics: `buildBaseFilter`, the unread-counts aggregation in `controllers/feeds.ts`
+  and `listFailures` all filter `dismissedAt: null`. Add that filter to any new entry query.
+- `GET /entries/failures` is keyset-paged like the feed (`limit` ≤ 100, default 20;
+  `cursor` = base64url `updatedAtISO|id`, sorted `updatedAt` desc) and returns
+  `{ items, nextCursor }`. Both Settings screens keep Diagnostics collapsed and only fetch
+  the first page when the user expands it.
 
 Fetch-pipeline failures (`failed`, `entry.error`, `retryEntry`) and summarization
 failures (summary null, re-invoke summarize) are separate failure modes with separate
@@ -275,7 +284,11 @@ matching Swift DTO. `PATCH /sources/:id` accepts `categoryId: null` to un-assign
 ### iOS
 
 Native SwiftUI client that mirrors the web client's behavior 1:1 (same stores, rules, API
-calls and copy), built for iOS 26 with Swift 6 strict concurrency and Liquid Glass. Layout in
+calls and copy), built for iOS 26 with Swift 6 strict concurrency and Liquid Glass. It also
+runs on macOS as a **Mac Catalyst** app (`TARGETED_DEVICE_FAMILY 1,2,6`, "Designed for iPad"
+off): the Mac build uses `aRSS/aRSS-macCatalyst.entitlements` (app sandbox + network client +
+user-selected files) via `CODE_SIGN_ENTITLEMENTS[sdk=macosx*]`, while iOS keeps
+`aRSS.entitlements` — iOS provisioning rejects macOS sandbox keys, so never merge the two. Layout in
 `ios/aRSS`: `App/` (entry, composition root, root view, deep links), `Networking/` (`APIClient`
 actor, `Endpoints`, `ARSSAPI` protocol + `LiveARSSAPI`, DTOs), `Stores/` (`@Observable`
 Auth/Feed/Sources/Theme/Toast), `Navigation/` (split view on iPad, tabs on iPhone), `Views/`,
@@ -287,6 +300,8 @@ developer only** — agents never run it (see "UI verification is the developer'
 cd ios && ./scripts/generate.sh        # xcodegen + pin SwiftPM deps from ios/Package.resolved
 # Agents: unit tests only.
 xcodebuild -project aRSS.xcodeproj -scheme aRSS -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:aRSSTests test
+# Same on macOS (Catalyst); -allowProvisioningUpdates lets Xcode create the Catalyst profile once.
+xcodebuild -project aRSS.xcodeproj -scheme aRSS -destination 'platform=macOS,variant=Mac Catalyst' -only-testing:aRSSTests -allowProvisioningUpdates test
 # Developer only — end-to-end smoke (Docker stack up, an existing account):
 TEST_RUNNER_SMOKE_EMAIL=… TEST_RUNNER_SMOKE_PASSWORD=… xcodebuild … -only-testing:aRSSUITests test
 ```
@@ -307,6 +322,10 @@ TEST_RUNNER_SMOKE_EMAIL=… TEST_RUNNER_SMOKE_PASSWORD=… xcodebuild … -only-
   `OnDeviceSummarizing` and is never instantiated in unit tests; refusals fall back to the
   cloud when one is configured. Settings has an "AI provider" section (driven entirely by
   `/me`) and an "On this device" toggle.
+- **Read aloud** (`Services/SpeechReader.swift`, web `lib/readAloud.ts`): the card reads the AI
+  summary it shows (else the fallback body); the detail page reads the full article (else the
+  summary). `ReadAloudScript` builds the spoken text and is the unit-tested part; one read at a
+  time, and the button stops its own read when it leaves the screen.
 - **Stores depend on the `ARSSAPI` protocol**, never on `APIClient` directly; tests inject
   `FakeARSSAPI`. `FeedStore` is a line-by-line port of `apps/web/src/stores/feed.ts` — change
   both or neither.
@@ -322,10 +341,33 @@ TEST_RUNNER_SMOKE_EMAIL=… TEST_RUNNER_SMOKE_PASSWORD=… xcodebuild … -only-
   stack; see `Local.xcconfig.example`). Never define these under `settings:` in project.yml:
   Xcode's project/target settings override xcconfig values, which silently disables overrides. The Google button hides
   itself when the id is empty. Magic links arrive as `arss://auth/magic?t=…` or a pasted web link.
-- **Liquid Glass is used sparingly**: system toolbars/tab bar, the "N new" pill, toasts, and
-  primary CTAs. Cards and rows are opaque paper surfaces on purpose.
+- **Liquid Glass is used sparingly**: system toolbars/tab bar, the glass sidebar
+  (`NavigationSplitView` + `List(selection:)`, so macOS 26 and iPadOS give it the system
+  treatment and selection highlight), the "N new" pill, toasts, and primary CTAs. Cards and
+  rows are opaque paper surfaces on purpose.
+- **Mac idioms on Catalyst**: SwiftUI `.toolbar` items render *inside the content* on
+  Catalyst, never in the window's title bar, so `Navigation/MacToolbar.swift` installs a real
+  `NSToolbar` on the `UITitlebar` (unified style, one row aligned with the traffic lights):
+  wordmark (`NSUIViewToolbarItem` hosting the SwiftUI `Wordmark`; swapped for a logo-only item
+  when `LayoutMetrics.sidebarWidth`, reported by `SidebarView`, drops below 250 pt — `minSize`
+  is unavailable on Catalyst), theme and Settings (hosted SwiftUI views, so the sun/moon follows
+  the window's real appearance) beside it, `.primarySidebarTrackingSeparatorItemIdentifier`, then All/Unread
+  (`NSToolbarItemGroup`), New/Old, Fetch and Mark read (`NSMenuToolbarItem`) over the content;
+  the feed scope and unread count are the window title/subtitle. It mirrors store state with
+  `withObservationTracking` and exists only while signed in. On the Mac the SwiftUI toolbars and
+  the root navigation bars are hidden (`#if targetEnvironment(macCatalyst)`); iPhone/iPad keep
+  them. The sidebar is a real selectable list (so, unlike the web, re-clicking the active scope
+  doesn't reload — ⌘R fetches, pull-to-refresh reloads), ⌘, opens Settings, tap targets carry
+  `.hoverEffect`, and the wordmark shows its name only when it fits whole (`ViewThatFits`).
+  Articles span the full content width in every layout.
 - Stable Xcode needs the simulator runtime matching its SDK installed (Xcode › Settings ›
   Components, or `xcodebuild -downloadPlatform iOS`) before it will offer any destination.
+- Catalyst test signing: XcodeGen's iOS unit-test preset sets `CODE_SIGN_IDENTITY[sdk=macosx*] = "-"`
+  (ad-hoc). With a team-signed host app, macOS then refuses to load the bundle ("different Team
+  IDs"), so both test targets override it to `Apple Development` in project.yml. Don't pass
+  `CODE_SIGNING_ALLOWED=NO` to a Catalyst build either — it leaves an unsigned bundle that
+  incremental builds reuse until a `clean`. A new Catalyst bundle id needs one run with
+  `-allowProvisioningUpdates`.
 
 ## Conventions
 

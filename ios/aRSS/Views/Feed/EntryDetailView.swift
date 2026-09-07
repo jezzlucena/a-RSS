@@ -116,6 +116,16 @@ struct EntryDetailView: View {
         }
     }
 
+    private func readAloudScript(_ entry: EntryDetail) -> String? {
+        if let text = entry.articleText?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
+            return ReadAloudScript.article(title: entry.title, body: text)
+        }
+        if let summary = entry.summary {
+            return ReadAloudScript.summary(title: entry.title, intro: summary.intro, bullets: summary.bullets)
+        }
+        return nil
+    }
+
     private func article(_ entry: EntryDetail, model: EntryDetailModel) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -180,7 +190,12 @@ struct EntryDetailView: View {
                 }
 
                 Rectangle().fill(Color.rule).frame(height: 1)
-                HStack {
+                HStack(spacing: 14) {
+                    // The detail page shows the full article, so that's what gets read; the
+                    // summary stands in only when no body was extracted.
+                    if let script = readAloudScript(entry) {
+                        ReadAloudButton(id: "detail:" + entry.id, text: script)
+                    }
                     if let url = URL(string: entry.url) {
                         Link("Open at source ↗", destination: url).foregroundStyle(Color.vermilion)
                     }
@@ -190,7 +205,6 @@ struct EntryDetailView: View {
                 .font(.chip)
             }
             .padding(24)
-            .frame(maxWidth: 720)
             .frame(maxWidth: .infinity)
         }
         .toolbar {

@@ -37,6 +37,9 @@ const entrySchema = new Schema(
       index: true,
     },
     error: { type: String, default: null },
+    /** Set when the user dismisses a failed article: hidden from the feed, counts and
+     *  diagnostics, but kept so the next poll's upsert doesn't resurrect it. */
+    dismissedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
