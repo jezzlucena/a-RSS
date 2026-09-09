@@ -14,7 +14,9 @@ final class AppEnvironment {
     let summarizationPreferences: SummarizationPreferences
     let summarizer: SummarizationService
     let navigation = AppNavigation()
-    let speech = SpeechReader()
+    let speech: SpeechReader
+    let listening: ListeningQueue
+    static let shared = AppEnvironment.live()
     let layoutMetrics = LayoutMetrics()
 
     init(api: any ARSSAPI, onDeviceEngine: any OnDeviceSummarizing) {
@@ -22,9 +24,12 @@ final class AppEnvironment {
         theme = ThemeStore()
         toasts = ToastCenter()
         auth = AuthStore(api: api)
+        speech = SpeechReader(api: api, auth: auth, toasts: toasts)
         sources = SourcesStore(api: api, auth: auth)
         summarizationPreferences = SummarizationPreferences()
         summarizer = SummarizationService(api: api, auth: auth, preferences: summarizationPreferences, engine: onDeviceEngine)
+        listening = ListeningQueue(api: api, auth: auth, summarizer: summarizer, speech: speech)
+        auth.onSessionEnded = { [weak speech, weak listening] in speech?.stop(); listening?.reset() }
         feed = FeedStore(api: api, auth: auth, sources: sources, toasts: toasts, summarizer: summarizer)
     }
 

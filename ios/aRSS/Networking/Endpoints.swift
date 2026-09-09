@@ -17,6 +17,13 @@ nonisolated enum Endpoints {
 
     // MARK: Me
     static var me: APIRequest { .get("/me") }
+    static func updateSpeechSettings(_ body: UpdateSpeechSettingsRequest) throws -> APIRequest { try .put("/me/speech", body: body) }
+    static var removeSpeechCredential: APIRequest { .delete("/me/speech") }
+    static func createSpeech(text: String) throws -> APIRequest {
+        var request = try APIRequest.post("/speech", body: CreateSpeechRequest(text: text))
+        request.accept = "audio/mpeg"
+        return request
+    }
     static func selectLlmProvider(_ id: LLMProviderID) throws -> APIRequest { try .put("/me/llm", body: SelectLLMProviderRequest(provider: id)) }
     static func upsertLlmCredential(_ id: LLMProviderID, _ body: UpsertLLMCredentialRequest) throws -> APIRequest { try .put("/me/llm/\(id.rawValue)", body: body) }
     static func removeLlmCredential(_ id: LLMProviderID) -> APIRequest { .delete("/me/llm/\(id.rawValue)") }

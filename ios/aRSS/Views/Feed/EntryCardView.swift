@@ -222,7 +222,7 @@ struct EntryExpandedBody: View {
             HStack(spacing: 14) {
                 // Reads whatever the card is showing: the AI summary, else the fallback body.
                 if let script = readAloudScript {
-                    ReadAloudButton(id: entry.id, text: script)
+                    ReadAloudButton(id: entry.id, text: script, title: entry.title)
                 }
                 Button("Full article ↗") { onOpenDetail(entry.id) }
                     .buttonStyle(.plain)

@@ -17,6 +17,15 @@ struct ReadAloudScriptTests {
         #expect(script == "Title.\nOne.")
     }
 
+    @Test func longArticlesAndEmojiRespectTheServerUTF16Limit() {
+        for text in [String(repeating: "word ", count: 3000), String(repeating: "x", count: 9001), String(repeating: "😀", count: 4501), "e" + String(repeating: "\u{0301}", count: 9001)] {
+            let chunks = ReadAloudScript.chunks(text)
+            #expect(chunks.count > 1)
+            #expect(chunks.allSatisfy { !$0.isEmpty && $0.utf16.count <= 4000 })
+            #expect(chunks.joined().replacingOccurrences(of: " ", with: "") == text.replacingOccurrences(of: " ", with: ""))
+        }
+    }
+
     @Test func articleReadsTitleThenBody() {
         let script = ReadAloudScript.article(title: "Title", body: "\n\nBody text here.\n")
         #expect(script == "Title.\n\nBody text here.")

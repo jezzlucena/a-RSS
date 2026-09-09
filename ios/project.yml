@@ -56,7 +56,13 @@ targets:
         CFBundleVersion: "1"
         UILaunchScreen: {}
         UIApplicationSceneManifest:
-          UIApplicationSupportsMultipleScenes: false
+          UIApplicationSupportsMultipleScenes: true
+          UISceneConfigurations:
+            CPTemplateApplicationSceneSessionRoleApplication:
+              - UISceneClassName: CPTemplateApplicationScene
+                UISceneConfigurationName: CarPlay
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).CarPlaySceneDelegate
+        UIBackgroundModes: [audio]
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
@@ -80,6 +86,7 @@ targets:
       path: aRSS/aRSS.entitlements
       properties:
         com.apple.developer.applesignin: [Default]
+        com.apple.developer.carplay-audio: true
     dependencies:
       - package: GoogleSignIn
         product: GoogleSignIn

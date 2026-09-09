@@ -40,6 +40,7 @@ struct SettingsView: View {
 
             AIProviderSection()
             OnDeviceSection()
+            SpeechSettingsSection()
             PasswordSection()
             DiagnosticsSection()
         }

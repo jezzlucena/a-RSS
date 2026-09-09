@@ -5,3 +5,4 @@ export * from './sources.js';
 export * from './entries.js';
 export * from './feeds.js';
 export * from './llm.js';
+export * from './speech.js';

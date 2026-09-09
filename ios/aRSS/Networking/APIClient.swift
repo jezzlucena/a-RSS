@@ -90,7 +90,7 @@ actor APIClient {
             }
         }
         guard (200..<300).contains(response.statusCode) else {
-            throw Self.makeError(status: response.statusCode, data: data)
+            throw Self.makeError(status: response.statusCode, data: data, request: request)
         }
         return (data, response)
     }
@@ -183,8 +183,26 @@ actor APIClient {
         storage.setCookie(vaulted)
     }
 
-    nonisolated private static func makeError(status: Int, data: Data) -> APIError {
-        if let body = try? JSONCoding.makeDecoder().decode(APIErrorBody.self, from: data) {
+    nonisolated private static func makeError(status: Int, data: Data, request: APIRequest) -> APIError {
+        let body = try? JSONCoding.makeDecoder().decode(APIErrorBody.self, from: data)
+        // Older API deployments (or a proxy pointing at the wrong server) return a generic
+        // route 404. Saving settings never calls ElevenLabs, so don't imply a bad voice/key.
+        // Preserve specific errors such as user_not_found and speech_invalid_voice.
+        if status == 404, body?.error == nil || body?.error == "not_found" {
+            let feature: String? = switch (request.method, request.path) {
+            case (.put, "/me/speech"), (.delete, "/me/speech"): "read aloud settings"
+            case (.post, "/speech"): "ElevenLabs playback"
+            default: nil
+            }
+            if let feature {
+                return .http(
+                    status: status, code: "speech_endpoint_unavailable",
+                    message: "The \(feature) endpoint is unavailable on this a-RSS server (HTTP 404). Update the API server with ElevenLabs support, or check the app's server URL.",
+                    retryable: false
+                )
+            }
+        }
+        if let body {
             // validation_error carries `details` but no `message`; fall back to the code,
             // which is what the web's ApiError does too.
             let message = body.message ?? (body.error == "validation_error" ? "Invalid request" : body.error)

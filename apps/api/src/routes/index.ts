@@ -6,6 +6,7 @@ import sourceRoutes from './sources.js';
 import opmlRoutes from './opml.js';
 import feedRoutes from './feeds.js';
 import entryRoutes from './entries.js';
+import speechRoutes from './speech.js';
 import { runHealthChecks } from '../services/healthChecks.js';
 
 const router = Router();
@@ -27,5 +28,6 @@ router.use('/sources', sourceRoutes);
 router.use('/opml', opmlRoutes);
 router.use('/feeds', feedRoutes);
 router.use('/entries', entryRoutes);
+router.use('/speech', speechRoutes);
 
 export default router;

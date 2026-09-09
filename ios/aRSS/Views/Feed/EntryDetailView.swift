@@ -194,7 +194,7 @@ struct EntryDetailView: View {
                     // The detail page shows the full article, so that's what gets read; the
                     // summary stands in only when no body was extracted.
                     if let script = readAloudScript(entry) {
-                        ReadAloudButton(id: "detail:" + entry.id, text: script)
+                        ReadAloudButton(id: "detail:" + entry.id, text: script, title: entry.title)
                     }
                     if let url = URL(string: entry.url) {
                         Link("Open at source ↗", destination: url).foregroundStyle(Color.vermilion)

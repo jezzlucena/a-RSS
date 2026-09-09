@@ -56,6 +56,25 @@ struct SourcesStoreTests {
         #expect(store.sourceCount(categoryId: "c1") == 0)
     }
 
+    @Test func failedDeleteKeepsCategorySourcesAndCounts() async throws {
+        let api = FakeARSSAPI()
+        api.categoriesResult = .success([aRSS.Category(id: "c1", name: "Tech", color: nil)])
+        api.sourcesResult = .success([Make.source("s1", title: "A", categoryId: "c1")])
+        api.unreadCountsResult = .success(UnreadCounts(all: 2, categories: ["c1": 2], sources: ["s1": 2]))
+        api.deleteCategoryError = Make.serverError
+        let store = makeStore(api)
+        await store.load()
+        await #expect(throws: Make.serverError) { try await store.deleteCategory(id: "c1") }
+        #expect(store.categories.count == 1)
+        #expect(store.sources.first?.categoryId == "c1")
+        #expect(store.unreadCounts.categories["c1"] == 2)
+        api.deleteCategoryError = nil
+        try await store.deleteCategory(id: "c1")
+        #expect(store.unreadCounts.categories["c1"] == nil)
+        #expect(store.unreadCounts.all == 2)
+        #expect(store.unreadCounts.sources["s1"] == 2)
+    }
+
     @Test func titleLookupsUseTheWebFallbacks() async {
         let api = FakeARSSAPI()
         api.categoriesResult = .success([aRSS.Category(id: "c1", name: "Tech", color: nil)])

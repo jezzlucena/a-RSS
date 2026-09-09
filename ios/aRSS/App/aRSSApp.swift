@@ -2,7 +2,7 @@ import SwiftUI
 
 @main
 struct aRSSApp: App {
-    @State private var environment = AppEnvironment.live()
+    @State private var environment = AppEnvironment.shared
 
     var body: some Scene {
         WindowGroup {

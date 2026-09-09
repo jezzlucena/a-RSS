@@ -13,6 +13,8 @@ final class AuthStore {
     private(set) var me: MeResponse?
 
     private let api: any ARSSAPI
+    private var hydrationTask: Task<Void, Never>?
+    var onSessionEnded: (() -> Void)?
 
     init(api: any ARSSAPI) {
         self.api = api
@@ -24,7 +26,15 @@ final class AuthStore {
     var isLlmConfigured: Bool { activeProvider?.configured ?? false }
 
     func hydrate() async {
+        if let hydrationTask { await hydrationTask.value; return }
         guard status == .unknown else { return }
+        let task = Task { await restore() }
+        hydrationTask = task
+        await task.value
+        hydrationTask = nil
+    }
+
+    private func restore() async {
         if await api.restoreSession() {
             await fetchMeAndStore()
         } else {
@@ -39,6 +49,7 @@ final class AuthStore {
             me = try await api.me()
             status = .authenticated
         } catch {
+            onSessionEnded?()
             me = nil
             status = .anonymous
             await api.setAccessToken(nil)
@@ -104,8 +115,17 @@ final class AuthStore {
         await fetchMeAndStore()
     }
 
+    func saveSpeechSettings(_ request: UpdateSpeechSettingsRequest) async throws {
+        me?.speech = try await api.updateSpeechSettings(request)
+    }
+
+    func removeSpeechCredential() async throws {
+        me?.speech = try await api.removeSpeechCredential()
+    }
+
     /// Best-effort server logout (it clears the refresh cookie), then unconditional local reset.
     func logout() async {
+        onSessionEnded?()
         try? await api.logout()
         await api.setAccessToken(nil)
         me = nil
@@ -116,6 +136,7 @@ final class AuthStore {
     /// screen instead of leaving a half-working UI behind.
     func noteError(_ error: any Error) {
         guard case .unauthenticated = error as? APIError else { return }
+        onSessionEnded?()
         me = nil
         status = .anonymous
     }

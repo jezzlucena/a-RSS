@@ -22,6 +22,13 @@ final class FakeARSSAPI: ARSSAPI {
     var loginResult: Result<AuthTokensResponse, APIError> = .success(AuthTokensResponse(accessToken: "access-1", expiresIn: 900))
     var logoutCalls = 0
 
+    var speechSettings = SpeechSettings.defaults
+    var speechSettingsCalls: [UpdateSpeechSettingsRequest] = []
+    var speechTexts: [String] = []
+    var speechResult: Result<Data, APIError> = .success(Data([1, 2, 3]))
+    var deleteCategoryError: APIError?
+    var deleteCategoryCalls: [String] = []
+
     // Feed
     var feedPages: [Result<FeedResponse, APIError>] = []
     var feedCalls: [FeedCall] = []
@@ -73,6 +80,16 @@ final class FakeARSSAPI: ARSSAPI {
     @MainActor func logout() async throws { logoutCalls += 1 }
 
     @MainActor func me() async throws -> MeResponse { try meResult.get() }
+    @MainActor func updateSpeechSettings(_ request: UpdateSpeechSettingsRequest) async throws -> SpeechSettings {
+        speechSettingsCalls.append(request)
+        if let provider = request.provider { speechSettings.provider = provider }
+        if request.apiKey != nil { speechSettings.configured = true }
+        if let voiceId = request.voiceId { speechSettings.voiceId = voiceId }
+        if let modelId = request.modelId { speechSettings.modelId = modelId }
+        return speechSettings
+    }
+    @MainActor func removeSpeechCredential() async throws -> SpeechSettings { speechSettings.provider = .system; speechSettings.configured = false; return speechSettings }
+    @MainActor func createSpeech(text: String) async throws -> Data { speechTexts.append(text); return try speechResult.get() }
     @MainActor func selectLlmProvider(_ id: LLMProviderID) async throws { selectProviderCalls.append(id) }
     @MainActor func upsertLlmCredential(_ id: LLMProviderID, _ request: UpsertLLMCredentialRequest) async throws { upsertCalls.append((id, request)) }
     @MainActor func removeLlmCredential(_ id: LLMProviderID) async throws { removeCredentialCalls.append(id) }
@@ -171,7 +188,10 @@ final class FakeARSSAPI: ARSSAPI {
         return category
     }
 
-    @MainActor func deleteCategory(id: String) async throws {}
+    @MainActor func deleteCategory(id: String) async throws {
+        deleteCategoryCalls.append(id)
+        if let deleteCategoryError { throw deleteCategoryError }
+    }
 
     @MainActor func importOPML(xml: String) async throws -> OPMLImportResult { OPMLImportResult(importedCategories: 0, importedSources: 0, skippedSources: 0) }
     @MainActor func exportOPML() async throws -> Data { Data("<opml/>".utf8) }

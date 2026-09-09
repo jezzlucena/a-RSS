@@ -1,65 +1,95 @@
 import { useSyncExternalStore } from 'react';
-
-/**
- * Read a summary or an article aloud with the browser's speech synthesis. One thing speaks at a
- * time: starting a new read cancels the previous one. Mirrors ios/aRSS/Services/SpeechReader.swift.
- */
+import { splitSpeechText } from '@a-rss/shared';
+import { apiBlob } from '@/lib/api';
 
 export const readAloudSupported =
   typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
 
 let speakingId: string | null = null;
+let generation = 0;
+let controller: AbortController | null = null;
+let audioContext: AudioContext | null = null;
+let audioSource: AudioBufferSourceNode | null = null;
 const listeners = new Set<() => void>();
 
-function notify(): void {
-  for (const listener of listeners) listener();
-}
-
+function notify(): void { for (const listener of listeners) listener(); }
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
-
-/** The id currently being read, or null — re-renders subscribers when it changes. */
 export function useSpeakingId(): string | null {
   return useSyncExternalStore(subscribe, () => speakingId, () => null);
 }
 
-export function toggleReadAloud(id: string, text: string): void {
-  if (!readAloudSupported) return;
-  if (speakingId === id) {
+export function toggleReadAloud(id: string, text: string, provider = 'system', onError?: (error: Error) => void): void {
+  if (speakingId === id) { stopReadAloud(); return; }
+  stopReadAloud();
+  if (!text.trim()) return;
+  speakingId = id;
+  const token = generation;
+  notify();
+  const fail = (error: Error): void => {
+    if (token !== generation) return;
     stopReadAloud();
+    onError?.(error);
+  };
+  if (provider === 'elevenlabs') {
+    controller = new AbortController();
+    const signal = controller.signal;
+    // Resume synchronously during the tap, before fetching. This preserves Safari's user
+    // activation requirement even when speech generation takes several seconds.
+    try {
+      const context = new AudioContext();
+      audioContext = context;
+      const unlocked = context.resume();
+      void unlocked.then(() => playElevenLabs(splitSpeechText(text), token, signal, context)).catch((error: unknown) => {
+        fail(error instanceof Error ? error : new Error('Could not play audio'));
+      });
+    } catch { fail(new Error('Audio playback is unavailable in this browser')); }
     return;
   }
-  stopReadAloud();
-  // Browsers (Chrome especially) drop very long utterances mid-way; a sentence-sized queue
-  // reads the whole thing and lets cancel() clear what's left.
+  if (!readAloudSupported) { fail(new Error('System speech is unavailable in this browser')); return; }
   const chunks = chunk(text);
-  speakingId = id;
-  notify();
   chunks.forEach((part, index) => {
     const utterance = new SpeechSynthesisUtterance(part);
-    if (index === chunks.length - 1) {
-      utterance.onend = () => finished(id);
-    }
-    utterance.onerror = () => finished(id);
+    if (index === chunks.length - 1) utterance.onend = () => { if (token === generation) stopReadAloud(); };
+    utterance.onerror = () => fail(new Error('Could not read this aloud'));
     window.speechSynthesis.speak(utterance);
   });
 }
 
-/** Stops the current read; with an id, only if that id is the one speaking. */
-export function stopReadAloud(id?: string): void {
-  if (!readAloudSupported) return;
-  if (id !== undefined && speakingId !== id) return;
-  if (speakingId === null) return;
-  speakingId = null;
-  window.speechSynthesis.cancel();
-  notify();
+async function playElevenLabs(chunks: string[], token: number, signal: AbortSignal, context: AudioContext): Promise<void> {
+  for (const text of chunks) {
+    if (token !== generation) return;
+    const blob = await apiBlob('/speech', { method: 'POST', body: { text }, signal });
+    if (token !== generation) return;
+    const buffer = await context.decodeAudioData(await blob.arrayBuffer());
+    if (token !== generation) return;
+    await new Promise<void>((resolve, reject) => {
+      const source = context.createBufferSource();
+      audioSource = source;
+      source.buffer = buffer;
+      source.connect(context.destination);
+      const cleanup = (): void => { signal.removeEventListener('abort', aborted); source.onended = null; source.disconnect(); };
+      const aborted = (): void => { cleanup(); reject(new DOMException('Stopped', 'AbortError')); };
+      signal.addEventListener('abort', aborted, { once: true });
+      source.onended = () => { cleanup(); resolve(); };
+      source.start();
+    });
+  }
+  if (token === generation) stopReadAloud();
 }
 
-function finished(id: string): void {
-  if (speakingId !== id) return;
+/** Cancel pending generation as well as playback; stale callbacks cannot stop a newer read. */
+export function stopReadAloud(id?: string): void {
+  if (id !== undefined && speakingId !== id) return;
+  generation++;
   speakingId = null;
+  controller?.abort();
+  controller = null;
+  if (audioSource) { audioSource.stop(); audioSource.disconnect(); audioSource = null; }
+  if (audioContext) { void audioContext.close().catch(() => {}); audioContext = null; }
+  if (readAloudSupported) window.speechSynthesis.cancel();
   notify();
 }
 

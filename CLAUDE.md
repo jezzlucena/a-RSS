@@ -84,6 +84,7 @@ pnpm --filter @a-rss/api build      # tsc — the API's typecheck
 pnpm --filter @a-rss/web build      # tsc -b + vite build
 pnpm build                          # all three in dependency order
 pnpm --filter @a-rss/api test       # vitest, apps/api/test/*.test.ts
+pnpm --filter @a-rss/web test       # Node unit tests for audio and binary API transport
 ```
 
 `@a-rss/shared` is consumed as `dist/`, not source. Inside Docker its `tsc --watch`
@@ -95,7 +96,7 @@ exists. Don't run it, don't "fix" it as a side effect; `tsc` is the safety net.
 
 Tests: six pure-function suites in `apps/api/test/` (feed cursors, fetcher strategy
 ladder, image URLs, OPML, poll interval adaptation, tokens). None touch Mongo, no
-supertest, no web tests. `test/setup.ts` seeds every env var `env.ts` requires; if you
+supertest. Web playback and binary transport have Node-only Vitest tests in apps/web/test/. `test/setup.ts` seeds every env var `env.ts` requires; if you
 add a required var to `env.ts`, add it there too or every suite that imports `env`
 exits mid-run.
 
@@ -325,7 +326,12 @@ TEST_RUNNER_SMOKE_EMAIL=… TEST_RUNNER_SMOKE_PASSWORD=… xcodebuild … -only-
 - **Read aloud** (`Services/SpeechReader.swift`, web `lib/readAloud.ts`): the card reads the AI
   summary it shows (else the fallback body); the detail page reads the full article (else the
   summary). `ReadAloudScript` builds the spoken text and is the unit-tested part; one read at a
-  time, and the button stops its own read when it leaves the screen.
+  time, and the button stops its own read when it leaves the screen. ElevenLabs is selected
+  per account in Settings; `/me/speech` stores the encrypted key and voice/model IDs,
+  `/speech` proxies bounded MP3 generation. The same native player handles CarPlay and
+  system media commands. CarPlay uses a separate title-only library and summary queue,
+  never a full-article fallback. See `docs/read-aloud-and-carplay.md` for setup, Apple's
+  entitlement requirement and the developer's manual checks.
 - **Stores depend on the `ARSSAPI` protocol**, never on `APIClient` directly; tests inject
   `FakeARSSAPI`. `FeedStore` is a line-by-line port of `apps/web/src/stores/feed.ts` — change
   both or neither.

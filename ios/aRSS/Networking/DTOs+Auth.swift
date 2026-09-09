@@ -13,6 +13,8 @@ nonisolated struct MeResponse: Codable, Sendable, Hashable {
     var authMethods: [AuthMethod]
     /** The account's summarization provider and per-provider configuration state. */
     var llm: LLMSettings
+    // Optional while older servers are upgraded; system speech remains available.
+    var speech: SpeechSettings? = nil
 }
 
 // MARK: - LLM providers (packages/shared/src/llm.ts)
@@ -133,4 +135,3 @@ nonisolated struct ChangePasswordRequest: Encodable, Sendable {
     /// Only sent when the account already has a password (web: included only if truthy).
     var currentPassword: String?
 }
-

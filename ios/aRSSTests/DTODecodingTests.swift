@@ -7,6 +7,18 @@ struct DTODecodingTests {
     private let decoder = JSONCoding.makeDecoder()
     private let encoder = JSONCoding.makeEncoder()
 
+    @Test func speechSettingsDecodeAndOmitAnUnchangedKey() throws {
+        let settings = try decoder.decode(SpeechSettings.self, from: Data(#"{"provider":"elevenlabs","configured":true,"voiceId":"voice-1","modelId":"eleven_multilingual_v2"}"#.utf8))
+        #expect(settings.provider == .elevenlabs)
+        #expect(settings.configured)
+        let me = try decoder.decode(MeResponse.self, from: Data(Fixtures.me.utf8))
+        #expect(me.speech == nil)
+        let request = UpdateSpeechSettingsRequest(provider: .system)
+        let body = try JSONSerialization.jsonObject(with: encoder.encode(request)) as? [String: Any]
+        #expect(body?["provider"] as? String == "system")
+        #expect(body?["apiKey"] == nil)
+    }
+
     @Test func decodesAFullFeedPage() throws {
         let page = try decoder.decode(FeedResponse.self, from: Data(Fixtures.feedResponse.utf8))
         #expect(page.entries.count == 2)

@@ -20,6 +20,9 @@ nonisolated protocol ARSSAPI: Sendable {
     func selectLlmProvider(_ id: LLMProviderID) async throws
     func upsertLlmCredential(_ id: LLMProviderID, _ request: UpsertLLMCredentialRequest) async throws
     func removeLlmCredential(_ id: LLMProviderID) async throws
+    func updateSpeechSettings(_ request: UpdateSpeechSettingsRequest) async throws -> SpeechSettings
+    func removeSpeechCredential() async throws -> SpeechSettings
+    func createSpeech(text: String) async throws -> Data
 
     // Feed
     func fetchFeed(scope: FeedScope, order: FeedOrder, unreadOnly: Bool, cursor: String?) async throws -> FeedResponse
@@ -73,6 +76,9 @@ nonisolated final class LiveARSSAPI: ARSSAPI {
     func logout() async throws { try await client.send(Endpoints.logout) }
 
     func me() async throws -> MeResponse { try await client.send(Endpoints.me) }
+    func updateSpeechSettings(_ request: UpdateSpeechSettingsRequest) async throws -> SpeechSettings { try await client.send(Endpoints.updateSpeechSettings(request)) }
+    func removeSpeechCredential() async throws -> SpeechSettings { try await client.send(Endpoints.removeSpeechCredential) }
+    func createSpeech(text: String) async throws -> Data { try await client.download(Endpoints.createSpeech(text: text)) }
     func selectLlmProvider(_ id: LLMProviderID) async throws { try await client.send(Endpoints.selectLlmProvider(id)) }
     func upsertLlmCredential(_ id: LLMProviderID, _ request: UpsertLLMCredentialRequest) async throws { try await client.send(Endpoints.upsertLlmCredential(id, request)) }
     func removeLlmCredential(_ id: LLMProviderID) async throws { try await client.send(Endpoints.removeLlmCredential(id)) }

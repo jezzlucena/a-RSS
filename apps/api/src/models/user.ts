@@ -1,5 +1,5 @@
 import { Schema, model, type InferSchemaType, type HydratedDocument } from 'mongoose';
-import { llmProviderId } from '@a-rss/shared';
+import { llmProviderId, DEFAULT_SPEECH_MODEL, DEFAULT_SPEECH_VOICE } from '@a-rss/shared';
 
 // One entry per provider the user has configured. Keys are AES-256-GCM encrypted with
 // USER_SECRETS_KEY (see services/userSecrets.ts); model/baseUrl are optional overrides.
@@ -20,6 +20,13 @@ const llmSettingsSchema = new Schema(
   { _id: false },
 );
 
+const speechSettingsSchema = new Schema({
+  provider: { type: String, enum: ['system', 'elevenlabs'], default: 'system' },
+  apiKeyEnc: { type: String, default: null },
+  voiceId: { type: String, default: DEFAULT_SPEECH_VOICE },
+  modelId: { type: String, default: DEFAULT_SPEECH_MODEL },
+}, { _id: false });
+
 const userSchema = new Schema(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
@@ -28,6 +35,7 @@ const userSchema = new Schema(
     appleSub: { type: String, default: null, index: true, sparse: true },
     displayName: { type: String, default: null },
     llm: { type: llmSettingsSchema, default: () => ({}) },
+    speech: { type: speechSettingsSchema, default: () => ({}) },
   },
   { timestamps: true },
 );

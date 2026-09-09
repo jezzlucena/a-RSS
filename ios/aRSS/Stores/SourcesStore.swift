@@ -98,6 +98,7 @@ final class SourcesStore {
     func deleteCategory(id: String) async throws {
         try await run { try await api.deleteCategory(id: id) }
         categories.removeAll { $0.id == id }
+        unreadCounts.categories.removeValue(forKey: id)
         sources = sources.map { source in
             var source = source
             if source.categoryId == id { source.categoryId = nil }

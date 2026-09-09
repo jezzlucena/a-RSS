@@ -5,6 +5,7 @@ import SwiftUI
 struct ReadAloudButton: View {
     let id: String
     let text: String
+    var title: String = ""
 
     @Environment(SpeechReader.self) private var reader
 
@@ -12,7 +13,7 @@ struct ReadAloudButton: View {
 
     var body: some View {
         Button {
-            reader.toggle(id: id, text: text)
+            reader.toggle(id: id, title: title, text: text)
         } label: {
             // Icon only; the label stays for VoiceOver.
             Label(speaking ? "Stop" : "Read aloud", systemImage: speaking ? "stop.fill" : "speaker.wave.2")

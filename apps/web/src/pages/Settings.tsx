@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useAuthStore } from '@/stores/auth';
 import { useFeedStore } from '@/stores/feed';
 import { useThemeStore, type ThemePreference } from '@/stores/theme';
@@ -10,6 +10,8 @@ import type {
   LlmProviderState,
   UpsertLlmCredentialRequest,
 } from '@a-rss/shared';
+
+import { DEFAULT_SPEECH_MODEL, DEFAULT_SPEECH_VOICE } from '@a-rss/shared';
 
 const THEME_OPTIONS: ThemePreference[] = ['system', 'light', 'dark'];
 
@@ -177,6 +179,7 @@ export default function SettingsPage() {
       </section>
 
       <AIProviderSection />
+      <SpeechSection />
 
       <section className="mt-14 border-t-2 border-ink pt-8">
         <h2 className="font-mono text-chip uppercase text-muted">Password</h2>
@@ -641,5 +644,70 @@ function ProviderPanel({
         </div>
       </form>
     </div>
+  );
+}
+
+
+function SpeechSection() {
+  const speech = useAuthStore((s) => s.me?.speech);
+  const save = useAuthStore((s) => s.saveSpeechSettings);
+  const remove = useAuthStore((s) => s.removeSpeechCredential);
+  const [provider, setProvider] = useState<'system' | 'elevenlabs'>('system');
+  const [apiKey, setApiKey] = useState('');
+  const [voiceId, setVoiceId] = useState(DEFAULT_SPEECH_VOICE);
+  const [modelId, setModelId] = useState(DEFAULT_SPEECH_MODEL);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  useEffect(() => {
+    setProvider(speech?.provider ?? 'system');
+    setVoiceId(speech?.voiceId ?? DEFAULT_SPEECH_VOICE);
+    setModelId(speech?.modelId ?? DEFAULT_SPEECH_MODEL);
+  }, [speech]);
+
+  async function submit(clear = false) {
+    setBusy(true); setError(null); setStatus(null);
+    try {
+      if (clear) await remove();
+      else await save({ provider, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}), voiceId: voiceId.trim(), modelId: modelId.trim() });
+      setApiKey('');
+      setStatus(clear ? 'Key removed. Using the system voice.' : 'Read aloud settings saved.');
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not save read aloud settings'); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <section className="mt-10 border-t border-rule pt-6">
+      <h2 className="font-display text-2xl font-semibold">Read aloud</h2>
+      <p className="mt-2 text-sm text-muted">Use the system voice or ElevenLabs on web, iOS and CarPlay. ElevenLabs receives the text you play and uses your account’s credits.</p>
+      <form className="mt-4 max-w-xl space-y-4" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
+        <fieldset disabled={busy} className="space-y-4">
+          <label className="block text-sm">Voice provider
+            <select value={provider} onChange={(e) => setProvider(e.target.value as 'system' | 'elevenlabs')} className="mt-1 block w-full border border-rule bg-paper p-2 text-ink">
+              <option value="system">System voice</option><option value="elevenlabs">ElevenLabs</option>
+            </select>
+          </label>
+          {provider === 'elevenlabs' && <>
+            <label className="block text-sm">{speech?.configured ? 'Replace API key (optional)' : 'ElevenLabs API key'}
+              <input type="password" autoComplete="new-password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} className="mt-1 block w-full border border-rule bg-paper p-2" />
+            </label>
+            <label className="block text-sm">Voice ID
+              <input required value={voiceId} onChange={(e) => setVoiceId(e.target.value)} className="mt-1 block w-full border border-rule bg-paper p-2" />
+            </label>
+            <p className="text-sm text-muted">The default voice is George. Copy another voice ID from your <a href="https://elevenlabs.io/app/voice-library" target="_blank" rel="noreferrer" className="underline">ElevenLabs voice library</a>.</p>
+            <label className="block text-sm">Model ID
+              <input required value={modelId} onChange={(e) => setModelId(e.target.value)} className="mt-1 block w-full border border-rule bg-paper p-2" />
+            </label>
+            <p className="text-sm text-muted">Your API key is encrypted on the server. Leave it blank to keep the saved key.</p>
+          </>}
+          <div className="flex gap-3">
+            <button type="submit" disabled={provider === 'elevenlabs' && !speech?.configured && !apiKey.trim()} className="border border-ink bg-ink px-4 py-2 text-paper disabled:opacity-50">{busy ? 'Saving…' : 'Save'}</button>
+            {speech?.configured && <button type="button" onClick={() => void submit(true)} className="border border-rule px-4 py-2 text-vermilion">Remove key</button>}
+          </div>
+        </fieldset>
+        {error && <p role="alert" className="text-sm text-vermilion">{error}</p>}
+        {status && <p role="status" className="text-sm text-muted">{status}</p>}
+      </form>
+    </section>
   );
 }

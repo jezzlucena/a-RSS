@@ -45,14 +45,25 @@ export interface ApiError extends Error {
   retryable: boolean;
 }
 
-function makeApiError(status: number, body: unknown): ApiError {
-  const code = (body as { error?: string })?.error;
-  const message = (body as { message?: string })?.message ?? code ?? `HTTP ${status}`;
+function makeApiError(status: number, body: unknown, path: string, method: string): ApiError {
+  let code = (body as { error?: string })?.error;
+  let message = (body as { message?: string })?.message ?? code ?? `HTTP ${status}`;
+  // A generic route 404 is a deployment/configuration issue, not vendor validation.
+  // Keep domain-specific failures (for example user_not_found) intact.
+  if (status === 404 && (!code || code === 'not_found')) {
+    const feature = path === '/me/speech' && ['PUT', 'DELETE'].includes(method)
+      ? 'read aloud settings'
+      : path === '/speech' && method === 'POST' ? 'ElevenLabs playback' : null;
+    if (feature) {
+      code = 'speech_endpoint_unavailable';
+      message = `The ${feature} endpoint is unavailable on this a-RSS server (HTTP 404). Update the API server with ElevenLabs support, or check the app's server URL.`;
+    }
+  }
   const err = new Error(message) as ApiError;
   err.status = status;
   err.code = code;
   err.details = (body as { details?: unknown })?.details;
-  err.retryable = Boolean((body as { retryable?: boolean })?.retryable);
+  err.retryable = code === 'speech_endpoint_unavailable' ? false : Boolean((body as { retryable?: boolean })?.retryable);
   return err;
 }
 
@@ -63,7 +74,7 @@ interface ApiOptions extends Omit<RequestInit, 'body' | 'headers'> {
   retryOnUnauthorized?: boolean;
 }
 
-export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Promise<T> {
+async function request(path: string, opts: ApiOptions = {}): Promise<Response> {
   const { body, headers = {}, retryOnUnauthorized = true, ...rest } = opts;
 
   const doFetch = async (): Promise<Response> => {
@@ -86,11 +97,24 @@ export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Pro
     if (refreshed) res = await doFetch();
   }
 
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw makeApiError(res.status, body, path, (opts.method ?? 'GET').toUpperCase());
+  }
+  return res;
+}
+
+export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Promise<T> {
+  const res = await request(path, opts);
   if (res.status === 204) return undefined as T;
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
-  if (!res.ok) throw makeApiError(res.status, data);
-  return data as T;
+  return (text ? JSON.parse(text) : null) as T;
+}
+
+/** Binary responses retain the JSON client's authentication, refresh and error handling. */
+export async function apiBlob(path: string, opts: ApiOptions = {}): Promise<Blob> {
+  const res = await request(path, opts);
+  return res.blob();
 }
 
 // Hydration on app boot — silent refresh attempt to recover the session from the cookie.

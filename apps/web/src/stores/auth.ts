@@ -1,6 +1,9 @@
+import { stopReadAloud } from '@/lib/readAloud';
 import { create } from 'zustand';
 import type {
   MeResponse,
+  SpeechSettings,
+  UpdateSpeechSettingsRequest,
   AuthTokensResponse,
   LlmProviderId,
   LlmProviderState,
@@ -23,6 +26,8 @@ interface AuthState {
   /** Partial upsert of one provider's key / model / base URL. */
   saveLlmCredential: (provider: LlmProviderId, body: UpsertLlmCredentialRequest) => Promise<void>;
   removeLlmCredential: (provider: LlmProviderId) => Promise<void>;
+  saveSpeechSettings: (body: UpdateSpeechSettingsRequest) => Promise<void>;
+  removeSpeechCredential: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -127,7 +132,20 @@ export const useAuthStore = create<AuthState>((set) => ({
     await fetchMeAndStore(set);
   },
 
+  saveSpeechSettings: async (body) => {
+    const speech = await api<SpeechSettings>('/me/speech', { method: 'PUT', body });
+    stopReadAloud();
+    set((state) => ({ me: state.me ? { ...state.me, speech } : null }));
+  },
+
+  removeSpeechCredential: async () => {
+    const speech = await api<SpeechSettings>('/me/speech', { method: 'DELETE' });
+    stopReadAloud();
+    set((state) => ({ me: state.me ? { ...state.me, speech } : null }));
+  },
+
   logout: async () => {
+    stopReadAloud();
     try {
       await api('/auth/logout', { method: 'POST', retryOnUnauthorized: false });
     } finally {

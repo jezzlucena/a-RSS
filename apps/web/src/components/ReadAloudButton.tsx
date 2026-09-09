@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { toast } from 'react-toastify';
+import { useAuthStore } from '@/stores/auth';
 import { readAloudSupported, stopReadAloud, toggleReadAloud, useSpeakingId } from '@/lib/readAloud';
 
 interface Props {
@@ -13,16 +15,17 @@ interface Props {
  * speech never outlives what the user is looking at. Renders nothing without speech synthesis.
  */
 export function ReadAloudButton({ id, text, className }: Props) {
+  const provider = useAuthStore((s) => s.me?.speech?.provider ?? 'system');
   const speaking = useSpeakingId() === id;
 
   useEffect(() => () => stopReadAloud(id), [id]);
 
-  if (!readAloudSupported) return null;
+  if (provider === 'system' && !readAloudSupported) return null;
 
   return (
     <button
       type="button"
-      onClick={() => toggleReadAloud(id, text)}
+      onClick={() => toggleReadAloud(id, text, provider, (error) => toast.error(error.message))}
       aria-pressed={speaking}
       title={speaking ? 'Stop reading' : 'Read this aloud'}
       aria-label={speaking ? 'Stop reading' : 'Read aloud'}

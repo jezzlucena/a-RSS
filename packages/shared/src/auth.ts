@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { llmSettings } from './llm.js';
+import { speechSettings } from './speech.js';
 
 export const emailSchema = z.string().email().toLowerCase().trim();
 
@@ -56,6 +57,7 @@ export const meResponse = z.object({
   authMethods: z.array(z.enum(['password', 'magic', 'google', 'apple'])),
   /** The account's summarization provider and per-provider configuration state. */
   llm: llmSettings,
+  speech: speechSettings,
 });
 export type MeResponse = z.infer<typeof meResponse>;
 

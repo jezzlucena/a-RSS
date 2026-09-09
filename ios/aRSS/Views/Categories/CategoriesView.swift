@@ -3,7 +3,11 @@ import SwiftUI
 /// Mirrors apps/web/src/pages/Categories.tsx.
 struct CategoriesView: View {
     @Environment(SourcesStore.self) private var sources
+    @Environment(FeedStore.self) private var feed
+    @Environment(ToastCenter.self) private var toasts
 
+    @State private var pendingDelete: Category?
+    @State private var deletingID: String?
     @State private var name = ""
     @State private var color: Color = Color(hex: "#C9412B") ?? .vermilion
     @State private var creating = false
@@ -40,7 +44,8 @@ struct CategoriesView: View {
                         .foregroundStyle(Color.muted)
                 }
                 ForEach(sources.categories) { category in
-                    CategoryRow(category: category)
+                    CategoryRow(category: category) { pendingDelete = category }
+                        .disabled(deletingID == category.id)
                 }
             } header: {
                 KickerText("Categories")
@@ -49,8 +54,30 @@ struct CategoriesView: View {
         .scrollContentBackground(.hidden)
         .background(Color.paper.ignoresSafeArea())
         .navigationTitle("Categories")
+        // Keep confirmation on the stable list, outside the swipe action's row lifecycle.
+        .confirmationDialog(
+            "Delete category \"\(pendingDelete?.name ?? "")\"? Sources will become uncategorized.",
+            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+            titleVisibility: .visible,
+            presenting: pendingDelete
+        ) { category in
+            Button("Delete", role: .destructive) { Task { await delete(category) } }
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
+        }
         .refreshable { await sources.load() }
         .task { if !sources.hasLoaded { await sources.load() } }
+    }
+
+    private func delete(_ category: Category) async {
+        guard deletingID == nil else { return }
+        deletingID = category.id
+        defer { deletingID = nil }
+        do {
+            try await sources.deleteCategory(id: category.id)
+            if feed.scope == .category(category.id) { feed.select(.all) }
+        } catch {
+            toasts.report(error, fallback: "Could not delete category")
+        }
     }
 
     /// Web: the color is always sent (even untouched) and only the name resets on success.
@@ -72,6 +99,7 @@ struct CategoriesView: View {
 /// Swatch with live preview and a single debounced PATCH, inline rename, source count, delete.
 struct CategoryRow: View {
     let category: Category
+    let requestDelete: () -> Void
 
     @Environment(SourcesStore.self) private var sources
     @Environment(FeedStore.self) private var feed
@@ -82,10 +110,10 @@ struct CategoryRow: View {
     @State private var draftName: String
     @State private var draftColor: Color
     @FocusState private var nameFocused: Bool
-    @State private var confirmDelete = false
 
-    init(category: Category) {
+    init(category: Category, requestDelete: @escaping () -> Void) {
         self.category = category
+        self.requestDelete = requestDelete
         _draftName = State(initialValue: category.name)
         _draftColor = State(initialValue: Color(hex: category.color ?? "") ?? .uncategorizedDot)
     }
@@ -132,19 +160,13 @@ struct CategoryRow: View {
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
             Button("Show feed", systemImage: "newspaper") { showFeed() }.tint(.vermilion)
         }
-        .swipeActions(edge: .trailing) {
-            Button("Delete", systemImage: "trash", role: .destructive) { confirmDelete = true }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            // Destructive swipe buttons optimistically remove the row before confirmation.
+            Button("Delete", systemImage: "trash", action: requestDelete).tint(.red)
         }
         .contextMenu {
             Button("Show feed", systemImage: "newspaper") { showFeed() }
-            Button("Delete", systemImage: "trash", role: .destructive) { confirmDelete = true }
-        }
-        .confirmationDialog(
-            "Delete category \"\(category.name)\"? Sources will become uncategorized.",
-            isPresented: $confirmDelete,
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) { Task { await delete() } }
+            Button("Delete", systemImage: "trash", role: .destructive, action: requestDelete)
         }
     }
 
@@ -174,11 +196,4 @@ struct CategoryRow: View {
         }
     }
 
-    private func delete() async {
-        do {
-            try await sources.deleteCategory(id: category.id)
-        } catch {
-            toasts.report(error, fallback: "Could not delete category")
-        }
-    }
 }

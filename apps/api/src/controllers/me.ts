@@ -4,6 +4,7 @@ import {
   llmProviderId,
   selectLlmProviderRequest,
   upsertLlmCredentialRequest,
+  updateSpeechSettingsRequest,
   type LlmProviderId,
   type MeResponse,
 } from '@a-rss/shared';
@@ -12,6 +13,7 @@ import { getUserId } from '../middleware/auth.js';
 import { HttpError } from '../middleware/errors.js';
 import { encryptSecret } from '../services/userSecrets.js';
 import { buildLlmSettings, normalizeBaseUrl } from '../services/llm/index.js';
+import { buildSpeechSettings } from '../services/speech.js';
 
 async function loadUser(req: Request): Promise<UserDoc> {
   const user = await User.findById(getUserId(req));
@@ -40,6 +42,7 @@ export const getMe: RequestHandler = async (req, res) => {
     displayName: user.displayName ?? null,
     authMethods,
     llm: buildLlmSettings(user),
+    speech: buildSpeechSettings(user),
   };
   res.json(response);
 };
@@ -106,4 +109,26 @@ export const removeLlmCredential: RequestHandler = async (req, res) => {
   user.llm.credentials.delete(provider);
   await user.save();
   res.status(204).end();
+};
+
+export const updateSpeechSettings: RequestHandler = async (req, res) => {
+  const body = updateSpeechSettingsRequest.parse(req.body);
+  const user = await loadUser(req);
+  if (body.apiKey !== undefined) user.speech.apiKeyEnc = encryptSecret(body.apiKey);
+  if (body.provider !== undefined) user.speech.provider = body.provider;
+  if (body.voiceId !== undefined) user.speech.voiceId = body.voiceId;
+  if (body.modelId !== undefined) user.speech.modelId = body.modelId;
+  if (user.speech.provider === 'elevenlabs' && !user.speech.apiKeyEnc) {
+    throw new HttpError(400, 'speech_not_configured', 'Enter an ElevenLabs API key before selecting ElevenLabs.');
+  }
+  await user.save();
+  res.json(buildSpeechSettings(user));
+};
+
+export const removeSpeechCredential: RequestHandler = async (req, res) => {
+  const user = await loadUser(req);
+  user.speech.apiKeyEnc = null;
+  user.speech.provider = 'system';
+  await user.save();
+  res.json(buildSpeechSettings(user));
 };

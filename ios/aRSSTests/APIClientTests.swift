@@ -122,6 +122,88 @@ struct APIClientTests {
         #expect(request.jsonBody?["categoryId"] is NSNull)
     }
 
+    @Test func speechDownloadsUseAuthenticationAndJSONRequestBody() async throws {
+        let client = await makeClient { request in
+            if request.path.hasSuffix("/auth/refresh") { return .init(status: 200, json: Fixtures.tokens) }
+            return request.authorization == "Bearer new-token"
+                ? .init(status: 200, json: "audio bytes", headers: ["Content-Type": "audio/mpeg"])
+                : .init(status: 401, json: Fixtures.invalidToken)
+        }
+        let data = try await LiveARSSAPI(client: client).createSpeech(text: "Title. Summary.")
+        #expect(String(decoding: data, as: UTF8.self) == "audio bytes")
+        let request = try #require(StubURLProtocol.recorded.last)
+        #expect(request.path == "/api/v1/speech")
+        #expect(request.method == "POST")
+        #expect(request.headers["Accept"] == "audio/mpeg")
+        #expect(request.jsonBody?["text"] as? String == "Title. Summary.")
+        #expect(request.jsonBody?["apiKey"] == nil)
+    }
+
+    @Test func missingSpeechRoutesExplainTheServerUpdateForJSONAndProxy404s() async throws {
+        let requests = [
+            try Endpoints.updateSpeechSettings(UpdateSpeechSettingsRequest(provider: .elevenlabs, apiKey: "private-test-key", voiceId: "voice-123", modelId: "model-123")),
+            Endpoints.removeSpeechCredential,
+            try Endpoints.createSpeech(text: "Private article text")
+        ]
+        for json in [true, false] {
+            let client = await makeClient { _ in
+                json
+                    ? .init(status: 404, json: #"{"error":"not_found","message":"Not found","retryable":false}"#)
+                    : .init(status: 404, text: "<html>Not Found</html>")
+            }
+            for request in requests {
+                do {
+                    try await client.send(request)
+                    Issue.record("expected a missing speech endpoint error")
+                } catch let error as APIError {
+                    #expect(error.status == 404)
+                    #expect(error.code == "speech_endpoint_unavailable")
+                    #expect(!error.retryable)
+                    let message = error.userMessage(fallback: "")
+                    #expect(message.contains("Update the API server with ElevenLabs support"))
+                    #expect(message.contains("check the app's server URL"))
+                    #expect(message.contains(request.path == "/speech" ? "ElevenLabs playback" : "read aloud settings"))
+                    #expect(!message.contains("private-test-key"))
+                    #expect(!message.contains("Private article text"))
+                }
+            }
+            #expect(StubURLProtocol.recorded.count == requests.count, "a missing route should not trigger auth refresh or automatic retries")
+        }
+    }
+
+    @Test func speechRouteDiagnosisPreservesSpecificErrorsAndOther404s() async throws {
+        for code in ["user_not_found", "speech_invalid_voice"] {
+            let client = await makeClient { _ in
+                .init(status: 404, json: "{\"error\":\"\(code)\",\"message\":\"Specific cause\",\"retryable\":false}")
+            }
+            await #expect(throws: APIError.http(status: 404, code: code, message: "Specific cause", retryable: false)) {
+                try await client.send(Endpoints.updateSpeechSettings(UpdateSpeechSettingsRequest(provider: .system)))
+            }
+        }
+        let client = await makeClient { _ in
+            .init(status: 404, json: #"{"error":"not_found","message":"Not found","retryable":false}"#)
+        }
+        await #expect(throws: APIError.http(status: 404, code: "not_found", message: "Not found", retryable: false)) {
+            try await client.send(Endpoints.entry(id: "missing"))
+        }
+    }
+
+    @Test func invalidElevenLabsCredentialsKeepTheirActionableError() async throws {
+        let client = await makeClient { _ in
+            .init(status: 422, json: #"{"error":"speech_auth_failed","message":"ElevenLabs rejected your API key. Check its permissions in Settings.","retryable":false}"#)
+        }
+        await #expect(throws: APIError.http(status: 422, code: "speech_auth_failed", message: "ElevenLabs rejected your API key. Check its permissions in Settings.", retryable: false)) {
+            try await client.send(Endpoints.createSpeech(text: "Summary."))
+        }
+    }
+
+    @Test func categoryDeletionAccepts204WithoutDecoding() async throws {
+        let client = await makeClient { _ in .noContent }
+        try await LiveARSSAPI(client: client).deleteCategory(id: "category-1")
+        #expect(StubURLProtocol.recorded.first?.method == "DELETE")
+        #expect(StubURLProtocol.recorded.first?.path == "/api/v1/categories/category-1")
+    }
+
     @Test func downloadReturnsRawBytes() async throws {
         let client = await makeClient { _ in .init(status: 200, json: "<opml/>", headers: ["Content-Type": "text/x-opml"]) }
         let data = try await client.download(Endpoints.exportOPML)
